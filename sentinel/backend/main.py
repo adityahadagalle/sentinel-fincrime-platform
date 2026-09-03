@@ -375,6 +375,21 @@ async def _process_policy_and_action(transaction: dict[str, Any], case: dict[str
     return policy_decision, execution_record
 
 
+def _get_account_kyc_status(acc_id: str, acc_record: Optional[dict] = None) -> str:
+    if acc_record and acc_record.get("kyc_status"):
+        return str(acc_record["kyc_status"]).upper()
+    if not acc_id:
+        return "PENDING"
+    upper = acc_id.upper()
+    if upper.startswith("ACC-USR") or upper.startswith("ACC-MERCH") or upper.startswith("ACC-REGULAR"):
+        return "VERIFIED"
+    elif upper.startswith("ACC-EXIT"):
+        return "UNVERIFIED"
+    elif upper.startswith("ACC-MULE") or upper.startswith("ACC-HUB") or upper.startswith("ACC-LAYER"):
+        return "PENDING"
+    return "PENDING"
+
+
 @app.post("/transaction")
 async def process_tx(
     request: Request,
@@ -398,10 +413,16 @@ async def process_tx(
     accounts_to_save = []
 
     if sender_id:
-        acc_s = data_store.get("accounts", {}).get(sender_id) or {"account_id": sender_id}
+        acc_s = data_store.get("accounts", {}).get(sender_id) or {
+            "account_id": sender_id,
+            "kyc_status": _get_account_kyc_status(sender_id)
+        }
         accounts_to_save.append(acc_s)
     if receiver_id and receiver_id != sender_id:
-        acc_r = data_store.get("accounts", {}).get(receiver_id) or {"account_id": receiver_id}
+        acc_r = data_store.get("accounts", {}).get(receiver_id) or {
+            "account_id": receiver_id,
+            "kyc_status": _get_account_kyc_status(receiver_id)
+        }
         accounts_to_save.append(acc_r)
 
     await repo.save_transaction_and_case(accounts_to_save, transaction, case)
@@ -1693,6 +1714,130 @@ async def get_automation_mode() -> dict[str, Any]:
     }
 
 
+def compute_case_investigation_confidence(
+    evidence_package: Optional[dict] = None,
+    contextual_report: Optional[dict] = None,
+    regulatory_report: Optional[dict] = None,
+    audit_report: Optional[dict] = None,
+    analyst_report: Optional[dict] = None
+) -> dict[str, Any]:
+    """
+    Deterministically computes Investigation Confidence from actual multi-agent
+    investigation outputs in SENTINEL.
+    
+    Formula:
+      Score = clamp(round(0.35 * completeness + 0.40 * agreement + 0.25 * diversity - 1.0 * contradictions, 1), 0.0, 100.0)
+    """
+    # 1. Evidence Completeness (35% Weight)
+    # Evaluates presence across the 5 core empirical evidence dimensions from Phase 1
+    completeness = 0.0
+    ev_list = []
+    if evidence_package and isinstance(evidence_package, dict):
+        ev_list = evidence_package.get("evidence", [])
+        if not isinstance(ev_list, list):
+            ev_list = []
+
+    if ev_list:
+        has_tx = any(e.get("type") == "transaction" for e in ev_list if isinstance(e, dict))
+        has_baseline = any(
+            e.get("type") == "historical_behavior" and "Baseline" in str(e.get("category", ""))
+            for e in ev_list if isinstance(e, dict)
+        )
+        has_flow = any(
+            (e.get("type") in ("historical_behavior", "related_activity"))
+            and any(k in str(e.get("category", "")) for k in ("Counterparty", "Flow", "Chain"))
+            for e in ev_list if isinstance(e, dict)
+        )
+        has_graph = any(
+            e.get("type") == "graph_network" or "Graph" in str(e.get("category", ""))
+            for e in ev_list if isinstance(e, dict)
+        )
+        has_fin = any(
+            e.get("type") == "financial" or any(k in str(e.get("category", "")) for k in ("Financial", "Recovery"))
+            for e in ev_list if isinstance(e, dict)
+        )
+        present_dims = sum([1 if x else 0 for x in (has_tx, has_baseline, has_flow, has_graph, has_fin)])
+        completeness = round((present_dims / 5.0) * 100.0, 1)
+
+    # 2. Agent Agreement (40% Weight)
+    # Evaluates severity consensus across the evaluating agents (Contextual, Regulatory, Decision Support)
+    sev_map = {"CRITICAL": 100, "HIGH": 75, "MEDIUM": 50, "LOW": 25}
+    active_sevs = []
+
+    if contextual_report and isinstance(contextual_report, dict):
+        ctx_s = contextual_report.get("summary", {}).get("contextual_severity")
+        if ctx_s in sev_map:
+            active_sevs.append(("contextual", sev_map[ctx_s]))
+
+    if regulatory_report and isinstance(regulatory_report, dict):
+        reg_s = regulatory_report.get("summary", {}).get("regulatory_severity")
+        if reg_s in sev_map:
+            active_sevs.append(("regulatory", sev_map[reg_s]))
+
+    if analyst_report and isinstance(analyst_report, dict):
+        dec_s = analyst_report.get("summary", {}).get("regulatory_severity")
+        if dec_s in sev_map:
+            active_sevs.append(("decision_support", sev_map[dec_s]))
+
+    if len(active_sevs) >= 2:
+        pair_diffs = []
+        for i in range(len(active_sevs)):
+            for j in range(i + 1, len(active_sevs)):
+                diff = abs(active_sevs[i][1] - active_sevs[j][1])
+                pair_diffs.append(max(0.0, 100.0 - diff))
+        agreement = round(sum(pair_diffs) / len(pair_diffs), 1)
+    elif len(active_sevs) == 1:
+        agreement = 75.0  # Single evaluated agent baseline
+    else:
+        agreement = 0.0
+
+    # 3. Source Diversity (25% Weight)
+    # Evaluates number of independent evidence sources supporting the investigation
+    sources = set()
+    if ev_list:
+        for e in ev_list:
+            if isinstance(e, dict) and e.get("source"):
+                sources.add(str(e.get("source")).strip())
+
+    if sources:
+        diversity = round(min(100.0, (len(sources) / 5.0) * 100.0), 1)
+    else:
+        diversity = 0.0
+
+    # 4. Contradictions (-1.0% penalty per contradiction)
+    # Detects polar conflicts (e.g. CRITICAL/HIGH vs LOW)
+    contradictions = 0
+    if len(active_sevs) >= 2:
+        for i in range(len(active_sevs)):
+            for j in range(i + 1, len(active_sevs)):
+                val_i = active_sevs[i][1]
+                val_j = active_sevs[j][1]
+                if (val_i >= 75 and val_j <= 25) or (val_j >= 75 and val_i <= 25):
+                    contradictions += 1
+
+    # Final Confidence Score & Label
+    raw_score = (0.35 * completeness) + (0.40 * agreement) + (0.25 * diversity) - (1.0 * contradictions)
+    score = round(min(100.0, max(0.0, raw_score)), 1)
+
+    if score >= 85.0:
+        label = "HIGH CONFIDENCE"
+    elif score >= 60.0:
+        label = "MEDIUM CONFIDENCE"
+    elif score > 0.0:
+        label = "LOW CONFIDENCE"
+    else:
+        label = "LOW CONFIDENCE"
+
+    return {
+        "evidence_completeness": completeness,
+        "agent_agreement": agreement,
+        "source_diversity": diversity,
+        "contradiction_count": contradictions,
+        "score": score,
+        "label": label
+    }
+
+
 @app.get("/analytics/overview")
 async def get_analytics_overview(
     timeframe: str = Query(default="30d", pattern="^(24h|7d|30d|12m)$"),
@@ -1716,6 +1861,34 @@ async def get_analytics_overview(
             cases_list = await repo.get_cases()
         except Exception:
             cases_list = []
+
+    # Apply timeframe filter if transactions have timestamps
+    if tx_list and timeframe:
+        from datetime import timedelta
+        now_utc = datetime.now(timezone.utc)
+        tf_delta = {
+            "24h": timedelta(hours=24),
+            "7d": timedelta(days=7),
+            "30d": timedelta(days=30),
+            "12m": timedelta(days=365)
+        }.get(timeframe)
+
+        if tf_delta:
+            cutoff = now_utc - tf_delta
+            def parse_tx_time(tx):
+                raw = tx.get("timestamp")
+                if not raw:
+                    return None
+                try:
+                    return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                except Exception:
+                    return None
+
+            timed_txs = [t for t in tx_list if parse_tx_time(t) is not None]
+            if timed_txs:
+                in_range = [t for t in timed_txs if parse_tx_time(t) >= cutoff]
+                if in_range:
+                    tx_list = in_range
 
     total_tx = len(tx_list)
     risk_alerts = [t for t in tx_list if float(t.get("risk_score", 0)) >= 40]
@@ -1747,14 +1920,7 @@ async def get_analytics_overview(
         })
 
     if not risk_trend:
-        risk_trend = [
-            {"timestamp": "00:00", "avg_score": 32, "high_risk": 2, "critical_risk": 0},
-            {"timestamp": "04:00", "avg_score": 45, "high_risk": 5, "critical_risk": 1},
-            {"timestamp": "08:00", "avg_score": 68, "high_risk": 12, "critical_risk": 3},
-            {"timestamp": "12:00", "avg_score": 74, "high_risk": 18, "critical_risk": 5},
-            {"timestamp": "16:00", "avg_score": 58, "high_risk": 9, "critical_risk": 2},
-            {"timestamp": "20:00", "avg_score": 62, "high_risk": 11, "critical_risk": 4}
-        ]
+        risk_trend = []
 
     # 2. Alerts by Risk Level
     crit_count = sum(1 for t in tx_list if float(t.get("risk_score", 0)) >= 85)
@@ -1779,39 +1945,197 @@ async def get_analytics_overview(
         "cases_investigated": cases_opened,
         "cases_resolved": total_resolved,
         "cases_escalated": cases_escalated,
-        "resolution_rate": resolution_rate,
-        "avg_investigation_time": "1h 42m"
+        "resolution_rate": resolution_rate
     }
 
-    # 4. Action Outcomes
+    # 3b. Investigation Confidence Telemetry (Tier 04 Investigation Performance)
+    tf_tx_ids = {t.get("tx_id") for t in tx_list}
+    active_cases = [
+        c for c in cases_list
+        if c.get("primary_tx_id") in tf_tx_ids or any(tx.get("tx_id") in tf_tx_ids for tx in c.get("transactions", []))
+    ] if tx_list else cases_list
+    if not active_cases and cases_list:
+        active_cases = cases_list
+
+    inv_runs_store = data_store.get("investigation_runs", {})
+    reports_store = data_store.get("investigation_reports", {})
+
+    cases_evaluated = 0
+    total_ev_comp = 0.0
+    total_agent_agree = 0.0
+    total_source_div = 0.0
+    total_contradictions = 0
+
+    for case in active_cases:
+        cid = case.get("case_id")
+        if not cid:
+            continue
+
+        run = next((r for r in inv_runs_store.values() if r.get("case_id") == cid), None)
+        stages = run.get("stages", {}) if run else {}
+
+        ev_pkg = case.get("evidence_package") or stages.get("EVIDENCE", {}).get("output") or reports_store.get(f"{cid}::EVIDENCE", {}).get("report_data")
+        ctx_rpt = case.get("contextual_investigation") or case.get("contextual_report") or stages.get("CONTEXTUAL", {}).get("output") or reports_store.get(f"{cid}::CONTEXTUAL", {}).get("report_data")
+        reg_rpt = case.get("regulatory_assessment") or case.get("regulatory_report") or stages.get("REGULATORY", {}).get("output") or reports_store.get(f"{cid}::REGULATORY", {}).get("report_data")
+        aud_rpt = case.get("audit_explanation") or case.get("audit_report") or stages.get("AUDIT", {}).get("output") or stages.get("AUDIT_EXPLANATION", {}).get("output") or reports_store.get(f"{cid}::AUDIT", {}).get("report_data")
+        dec_rpt = case.get("analyst_report") or case.get("decision_support") or stages.get("DECISION", {}).get("output") or stages.get("DECISION_SUPPORT", {}).get("output") or reports_store.get(f"{cid}::DECISION", {}).get("report_data")
+
+        # Only evaluate cases that have actual investigation run/stage data
+        has_any_output = any(x is not None for x in (ev_pkg, ctx_rpt, reg_rpt, aud_rpt, dec_rpt))
+        if not has_any_output and not run:
+            continue
+
+        case_conf = compute_case_investigation_confidence(
+            evidence_package=ev_pkg,
+            contextual_report=ctx_rpt,
+            regulatory_report=reg_rpt,
+            audit_report=aud_rpt,
+            analyst_report=dec_rpt
+        )
+
+        cases_evaluated += 1
+        total_ev_comp += case_conf["evidence_completeness"]
+        total_agent_agree += case_conf["agent_agreement"]
+        total_source_div += case_conf["source_diversity"]
+        total_contradictions += case_conf["contradiction_count"]
+
+    if cases_evaluated > 0:
+        avg_ev_comp = round(total_ev_comp / cases_evaluated, 1)
+        avg_agree = round(total_agent_agree / cases_evaluated, 1)
+        avg_div = round(total_source_div / cases_evaluated, 1)
+        avg_contra = int(round(total_contradictions / cases_evaluated))
+
+        raw_score = (0.35 * avg_ev_comp) + (0.40 * avg_agree) + (0.25 * avg_div) - (1.0 * avg_contra)
+        composite_score = round(min(100.0, max(0.0, raw_score)), 1)
+        conf_level = "HIGH CONFIDENCE" if composite_score >= 85.0 else ("MEDIUM CONFIDENCE" if composite_score >= 60.0 else "LOW CONFIDENCE")
+        status_val = "AVAILABLE"
+    else:
+        avg_ev_comp = 0.0
+        avg_agree = 0.0
+        avg_div = 0.0
+        avg_contra = 0
+        composite_score = 0.0
+        conf_level = "INSUFFICIENT DATA"
+        status_val = "INSUFFICIENT_DATA"
+
+    investigation_confidence = {
+        "status": status_val,
+        "score": composite_score,
+        "confidence_score": composite_score,
+        "label": conf_level,
+        "confidence_level": conf_level,
+        "evidence_completeness": avg_ev_comp,
+        "agent_agreement": avg_agree,
+        "source_diversity": avg_div,
+        "contradiction_count": avg_contra,
+        "cases_evaluated": cases_evaluated,
+        "timeframe": timeframe,
+        "weights": {
+            "evidence_completeness": 0.35,
+            "agent_agreement": 0.40,
+            "source_diversity": 0.25,
+            "contradiction_penalty": 1.0
+        },
+        "distinction": "Evidence Support Index • Not Fraud Probability",
+        "explanation": "Measures how strongly the investigation conclusion is supported by empirical evidence completeness, agent agreement, source diversity, and identified contradictions."
+    }
+
+    # 4. Action Outcomes (Deterministic policy enforcement records filtered by selected timeframe)
     executed_map = data_store.get("executed_actions", {})
     action_counts = {}
+    status_breakdown = {}
     auto_count = 0
     human_count = 0
 
+    from datetime import timedelta
+    def parse_action_time(rec):
+        raw = rec.get("timestamp")
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    cutoff_action = None
+    if timeframe:
+        tf_delta_map = {
+            "24h": timedelta(hours=24),
+            "7d": timedelta(days=7),
+            "30d": timedelta(days=30),
+            "12m": timedelta(days=365)
+        }
+        delta = tf_delta_map.get(timeframe)
+        if delta:
+            cutoff_action = datetime.now(timezone.utc) - delta
+
+    filtered_action_records = []
     for rec in executed_map.values():
+        rec_time = parse_action_time(rec)
+        if cutoff_action is not None and rec_time is not None:
+            if rec_time < cutoff_action:
+                continue
+        filtered_action_records.append(rec)
+
+    is_auto = bool(data_store.get("automation_mode", False))
+
+    for rec in filtered_action_records:
         ac = rec.get("action_code") or rec.get("action", "MONITOR")
         action_counts[ac] = action_counts.get(ac, 0) + 1
+        st = rec.get("execution_status", "UNKNOWN")
+        if ac not in status_breakdown:
+            status_breakdown[ac] = {}
+        status_breakdown[ac][st] = status_breakdown[ac].get(st, 0) + 1
+
         if rec.get("actor_type") == "AUTOMATION_ENGINE":
             auto_count += 1
         elif rec.get("actor_type") == "HUMAN_OPERATOR":
             human_count += 1
 
-    action_outcomes = [
-        {"action": "MONITOR", "count": action_counts.get("MONITOR", 0)},
-        {"action": "ENHANCED MONITORING", "count": action_counts.get("ENHANCED_MONITORING", 0)},
-        {"action": "ESCALATE", "count": action_counts.get("ESCALATE_ANALYST_REVIEW", 0)},
-        {"action": "BLOCK", "count": action_counts.get("BLOCK", 0)},
-        {"action": "REJECT", "count": action_counts.get("REJECT_TRANSACTION", 0)},
-        {"action": "FREEZE", "count": action_counts.get("FREEZE", 0)},
-        {"action": "FILE STR", "count": action_counts.get("FILE_STR", 0)},
-        {"action": "CLOSE ACCOUNT", "count": action_counts.get("CLOSE_ACCOUNT", 0)},
+    total_actions_timeframe = len(filtered_action_records)
+
+    SUPPORTED_ACTION_CONFIG = [
+        {"code": "ESCALATE_ANALYST_REVIEW", "action": "ESCALATE", "severity": "HIGH", "default_status": "Escalated to Queue"},
+        {"code": "FREEZE", "action": "FREEZE", "severity": "CRITICAL", "default_status": "Requires Operator Action"},
+        {"code": "ENHANCED_MONITORING", "action": "ENHANCED MONITORING", "severity": "MEDIUM", "default_status": "High Risk Watch"},
+        {"code": "MONITOR", "action": "MONITOR", "severity": "LOW", "default_status": "Standard Baseline"},
+        {"code": "BLOCK", "action": "BLOCK", "severity": "CRITICAL", "default_status": "Simulated Block"},
+        {"code": "REJECT_TRANSACTION", "action": "REJECT", "severity": "CRITICAL", "default_status": "Transaction Rejection"},
+        {"code": "FILE_STR", "action": "FILE STR", "severity": "HIGH", "default_status": "Regulatory Filing"},
+        {"code": "CLOSE_ACCOUNT", "action": "CLOSE ACCOUNT", "severity": "CRITICAL", "default_status": "Account Closure"}
     ]
 
+    action_outcomes = []
+    for cfg in SUPPORTED_ACTION_CONFIG:
+        cnt = action_counts.get(cfg["code"], 0)
+        pct = round((cnt / max(total_actions_timeframe, 1)) * 100, 1) if total_actions_timeframe > 0 else 0.0
+        st_dict = status_breakdown.get(cfg["code"], {})
+
+        if cfg["code"] == "FREEZE":
+            status_desc = f"Requires Operator Action ({cnt} pending)" if cnt > 0 else "Supported • 0 recorded in timeframe"
+        elif cnt > 0:
+            if not is_auto:
+                status_desc = f"Policy Evaluated • Held ({cnt} records)"
+            else:
+                status_desc = f"Autonomous Execution ({cnt} executed)"
+        else:
+            status_desc = "Supported • 0 recorded in timeframe"
+
+        action_outcomes.append({
+            "action": cfg["action"],
+            "code": cfg["code"],
+            "count": cnt,
+            "percentage": pct,
+            "severity": cfg["severity"],
+            "status": status_desc,
+            "status_breakdown": st_dict,
+            "supported": True,
+            "is_tracked": True
+        })
+
     # 5. Automation Intelligence
-    is_auto = bool(data_store.get("automation_mode", False))
     total_actions = auto_count + human_count
-    automation_rate = round((auto_count / max(total_actions, 1)) * 100, 1)
+    automation_rate = round((auto_count / max(total_actions, 1)) * 100, 1) if total_actions > 0 else 0.0
 
     automation_intelligence = {
         "automation_mode": is_auto,
@@ -1819,7 +2143,8 @@ async def get_analytics_overview(
         "human_actions_count": human_count,
         "automation_rate": automation_rate,
         "operator_interventions_count": human_count,
-        "freeze_interventions_count": action_counts.get("FREEZE", 0)
+        "freeze_interventions_count": action_counts.get("FREEZE", 0),
+        "total_actions_recorded": total_actions_timeframe
     }
 
     # 6. Channel Performance
@@ -1872,7 +2197,6 @@ async def get_analytics_overview(
     financial_impact = {
         "total_exposure": total_exposure,
         "recovered_assets": recovered_assets,
-        "in_flight": total_exposure * 0.2,
         "estimated_loss": estimated_loss,
         "recovery_rate": recovery_rate
     }
@@ -1891,17 +2215,14 @@ async def get_analytics_overview(
         "timeframe": timeframe,
         "kpis": {
             "total_transactions": total_tx,
-            "total_transactions_trend": "+12.4%",
             "risk_alerts": total_alerts,
-            "risk_alerts_trend": "+24.0%",
             "avg_risk_score": avg_score,
-            "avg_risk_score_trend": "-2.1%",
-            "cases_resolved": total_resolved,
-            "cases_resolved_trend": "+16.0%"
+            "cases_resolved": total_resolved
         },
         "risk_trend": risk_trend,
         "alerts_by_risk_level": alerts_by_risk_level,
         "investigation_performance": investigation_performance,
+        "investigation_confidence": investigation_confidence,
         "action_outcomes": action_outcomes,
         "automation_intelligence": automation_intelligence,
         "risk_distribution": alerts_by_risk_level,
@@ -2340,9 +2661,15 @@ async def trigger_multi_hop_scenario(
         receiver_id = transaction.get("receiver_account")
         accounts_to_save = []
         if sender_id:
-            accounts_to_save.append(data_store.get("accounts", {}).get(sender_id) or {"account_id": sender_id})
+            accounts_to_save.append(data_store.get("accounts", {}).get(sender_id) or {
+                "account_id": sender_id,
+                "kyc_status": _get_account_kyc_status(sender_id)
+            })
         if receiver_id and receiver_id != sender_id:
-            accounts_to_save.append(data_store.get("accounts", {}).get(receiver_id) or {"account_id": receiver_id})
+            accounts_to_save.append(data_store.get("accounts", {}).get(receiver_id) or {
+                "account_id": receiver_id,
+                "kyc_status": _get_account_kyc_status(receiver_id)
+            })
 
         await repo.save_transaction_and_case(accounts_to_save, transaction, case)
 

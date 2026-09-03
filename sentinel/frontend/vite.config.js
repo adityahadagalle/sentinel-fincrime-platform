@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      '/analytics': 'http://localhost:8000',
       '/intelligence': 'http://localhost:8000',
       '/automation-mode': 'http://localhost:8000',
       '/action': 'http://localhost:8000',
