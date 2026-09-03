@@ -10,7 +10,7 @@ import RiskBadge from './RiskBadge';
 import GoldenTimer from './GoldenTimer';
 import AnalystEvidenceViewer from './AnalystEvidenceViewer';
 import GraphCanvas from '../modules/GraphModule/GraphCanvas';
-import InvestigationStageCard from './InvestigationStageCard';
+import InvestigationWorkflowGraph from './InvestigationWorkflowGraph';
 import { maskAccount } from '../utils/maskAccount';
 
 /**
@@ -584,42 +584,11 @@ const InvestigationSidebar = ({
             </div>
           </div>
 
-          {/* 2. FIVE-STAGE INVESTIGATION TIMELINE */}
-          <div className="bg-[#0B132B] border border-[#1E293B] rounded-xl p-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-2.5 mb-3">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-sky-400" />
-                <span className="font-mono text-xs font-bold text-slate-200 uppercase tracking-wider">
-                  DETERMINISTIC 5-STAGE INVESTIGATION PIPELINE
-                </span>
-              </div>
-              <span className="text-[10px] font-mono text-slate-500">
-                AUDIT-READY VERIFIABLE LOGIC · ZERO MODEL DRIFT
-              </span>
-            </div>
-
-            {/* 5-Stage Investigation Flash Cards */}
-            <div className="space-y-1.5">
-              {timelineStages.map((stage, idx) => {
-                const isExpanded = expandedStage === stage.key;
-                return (
-                  <React.Fragment key={stage.key}>
-                    <InvestigationStageCard
-                      stage={stage}
-                      isExpanded={isExpanded}
-                      onToggle={(key) => setExpandedStage(expandedStage === key ? null : key)}
-                      graphData={graphData}
-                    />
-                    {idx < timelineStages.length - 1 && (
-                      <div className="flex justify-center my-0.5">
-                        <div className="w-px h-2 bg-gradient-to-b from-[#1E293B] to-slate-800" />
-                      </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
+          {/* 2. INTERACTIVE INVESTIGATION WORKFLOW GRAPH */}
+          <InvestigationWorkflowGraph
+            timelineStages={timelineStages}
+            graphData={graphData}
+          />
 
           {/* 3. INDEPENDENT AI ADVISORY CARD (QWEN 3:8B) */}
           {(showAiPanel || aiStatus === 'ready' || aiStatus === 'loading') && (
