@@ -21,6 +21,18 @@ def run_pipeline(tx: dict, store: dict) -> dict:
     if "accounts" not in store:
         store["accounts"] = {}
     
+    def _determine_kyc_status(acc_id: str, default: str = "PENDING") -> str:
+        if not acc_id:
+            return default
+        upper = acc_id.upper()
+        if upper.startswith("ACC-USR") or upper.startswith("ACC-MERCH") or upper.startswith("ACC-REGULAR"):
+            return "VERIFIED"
+        elif upper.startswith("ACC-EXIT"):
+            return "UNVERIFIED"
+        elif upper.startswith("ACC-MULE") or upper.startswith("ACC-HUB") or upper.startswith("ACC-LAYER"):
+            return "PENDING"
+        return default
+
     account = store["accounts"].get(sender_id)
     if not account:
         account = {
@@ -28,10 +40,13 @@ def run_pipeline(tx: dict, store: dict) -> dict:
             "avg_monthly_tx_amount": round(random.uniform(10000, 50000), 2),
             "current_balance_sim": round(random.uniform(50000, 250000), 2),
             "status": "active",
+            "kyc_status": _determine_kyc_status(sender_id, "PENDING"),
             "is_new_receiver": True # First time seen
         }
         store["accounts"][sender_id] = account
     else:
+        if "kyc_status" not in account:
+            account["kyc_status"] = _determine_kyc_status(sender_id, "PENDING")
         account["is_new_receiver"] = False
         
     # 1b. Try to find an existing active case to inherit origin_score
@@ -207,8 +222,13 @@ def run_pipeline(tx: dict, store: dict) -> dict:
                 "account_id": receiver_id,
                 # Initialization: Start with enough balance to cover the fraud inflow
                 "current_balance_sim": round(amount * random.uniform(0.9, 1.1), 2),
-                "status": "withdrawn" if receiver_id.startswith("ACC-EXIT") else "active"
+                "status": "withdrawn" if (receiver_id and receiver_id.startswith("ACC-EXIT")) else "active",
+                "kyc_status": _determine_kyc_status(receiver_id, "PENDING")
             }
+            if receiver_id:
+                store.setdefault("accounts", {})[receiver_id] = receiver_account
+        elif "kyc_status" not in receiver_account:
+            receiver_account["kyc_status"] = _determine_kyc_status(receiver_id, "PENDING")
             
         # Add Nodes to Graph
         add_node(case_id, account, store)

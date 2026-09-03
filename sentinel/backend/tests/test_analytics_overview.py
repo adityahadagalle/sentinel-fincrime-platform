@@ -86,5 +86,49 @@ class TestAnalyticsOverview(unittest.TestCase):
         self.assertTrue(auto["automation_mode"])
         self.assertGreaterEqual(auto["automated_actions_count"], 1)
 
+    def test_02_action_outcomes_reconciliation_and_timeframe(self):
+        from main import get_analytics_overview
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone.utc)
+        # Add an action from 2 hours ago (within 24h)
+        data_store["executed_actions"]["AUTO-ACTION:RECENT"] = {
+            "action_code": "FREEZE",
+            "actor_type": "AUTOMATION_ENGINE",
+            "execution_status": "REQUIRES_OPERATOR_ACTION",
+            "timestamp": (now - timedelta(hours=2)).isoformat()
+        }
+        # Add an action from 3 days ago (within 7d/30d, but NOT 24h)
+        data_store["executed_actions"]["AUTO-ACTION:3DAYS_OLD"] = {
+            "action_code": "ESCALATE_ANALYST_REVIEW",
+            "actor_type": "AUTOMATION_ENGINE",
+            "execution_status": "NOT_EXECUTED",
+            "timestamp": (now - timedelta(days=3)).isoformat()
+        }
+
+        # Query 24h: 3DAYS_OLD must be excluded
+        data_24h = asyncio.run(get_analytics_overview(timeframe="24h"))
+        actions_24h = data_24h["action_outcomes"]
+        total_24h = sum(a["count"] for a in actions_24h)
+        freeze_24h = next(a for a in actions_24h if a["code"] == "FREEZE")
+        escalate_24h = next(a for a in actions_24h if a["code"] == "ESCALATE_ANALYST_REVIEW")
+
+        self.assertEqual(freeze_24h["count"], 1)
+        self.assertEqual(escalate_24h["count"], 0) # excluded from 24h
+
+        # Query 7d: both RECENT and 3DAYS_OLD must be included
+        data_7d = asyncio.run(get_analytics_overview(timeframe="7d"))
+        actions_7d = data_7d["action_outcomes"]
+        freeze_7d = next(a for a in actions_7d if a["code"] == "FREEZE")
+        escalate_7d = next(a for a in actions_7d if a["code"] == "ESCALATE_ANALYST_REVIEW")
+
+        self.assertEqual(freeze_7d["count"], 1)
+        self.assertEqual(escalate_7d["count"], 1) # included in 7d
+
+        # Verify all 8 supported action types exist
+        self.assertEqual(len(actions_7d), 8)
+        # Verify reconciliation
+        self.assertEqual(sum(a["count"] for a in actions_7d), data_7d["automation_intelligence"]["total_actions_recorded"])
+
 if __name__ == "__main__":
     unittest.main()
