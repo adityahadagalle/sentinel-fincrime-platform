@@ -13,32 +13,53 @@ Architecture constraint:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from app.services.ollama_service import ollama_service, IntelligenceResult, OLLAMA_MODEL
 from app.core.data_store import data_store
 from app.engines.graph_engine import build_investigation_graph
+from app.repositories.base import AbstractCaseRepository
+from app.repositories.dependencies import get_repository
+from app.services.evidence_agent import collect_evidence_for_case
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 
 
-# ── INVESTIGATION CONTEXT BUILDER (Phase 10 data boundary) ───────────────────
-def _build_investigation_context(
+# ── INVESTIGATION CONTEXT BUILDER (Phase 10 data boundary & 5-Agent Synthesis) ─
+async def _build_investigation_context(
     case_id: str,
     store: dict[str, Any],
+    repo: Optional[AbstractCaseRepository] = None,
 ) -> dict[str, Any]:
     """
     Construct a clean, sanitized investigation context dict for Qwen.
+    Incorporates the actual persisted outputs of the 5-stage deterministic pipeline:
+      1. EVIDENCE (Evidence Collection)
+      2. CONTEXTUAL (Contextual Investigation)
+      3. REGULATORY (Regulatory Risk Assessment)
+      4. AUDIT_EXPLANATION (Audit Explanation)
+      5. DECISION_SUPPORT (Analyst Decision Support)
 
     SECURITY: Only investigation-relevant data is included.
     Never includes: passwords, tokens, secrets, DATABASE_URL, env vars,
     or any unrelated internal state.
     """
-    cases = store.get("cases", {})
-    case = cases.get(case_id)
+    from app.services.investigation_orchestrator import investigation_orchestrator
+
+    case = None
+    if repo is not None:
+        try:
+            case = await repo.get_case(case_id)
+        except Exception:
+            case = None
+
+    if not case:
+        cases = store.get("cases", {})
+        case = cases.get(case_id)
+
     if not case:
         return {}
 
@@ -120,6 +141,118 @@ def _build_investigation_context(
             f"at {last_action.get('timestamp', '')}"
         )
 
+    # ── 5-Stage Deterministic Investigation Status & Reports ──────────────────
+    stage_names = ["EVIDENCE", "CONTEXTUAL", "REGULATORY", "AUDIT_EXPLANATION", "DECISION_SUPPORT"]
+    inv_status: dict[str, str] = {s.lower(): "NOT_STARTED" for s in stage_names}
+    inv_reports: dict[str, Any] = {}
+
+    # 1. Check repo if provided
+    if repo is not None:
+        try:
+            run = await repo.get_active_investigation_run(case_id) or await repo.get_latest_investigation_run(case_id)
+            if run and isinstance(run, dict):
+                stage_states = run.get("stages", {})
+                for stg in stage_names:
+                    s_info = stage_states.get(stg, {})
+                    if s_info.get("status"):
+                        inv_status[stg.lower()] = s_info["status"]
+
+            for stg in stage_names:
+                rpt_obj = await repo.get_investigation_report(case_id, stg)
+                if rpt_obj and isinstance(rpt_obj.get("report_data"), dict):
+                    inv_reports[stg.lower()] = rpt_obj["report_data"]
+                    inv_status[stg.lower()] = "COMPLETED"
+        except Exception:
+            pass
+
+    # 2. Check active in-memory or persisted investigation runs in store
+    active_run = None
+    try:
+        active_run = investigation_orchestrator._active_investigations.get(case_id)
+    except Exception:
+        pass
+
+    if not active_run:
+        for r in store.get("investigation_runs", {}).values():
+            if isinstance(r, dict) and r.get("case_id") == case_id:
+                active_run = r
+                break
+
+    if active_run and isinstance(active_run, dict):
+        stages_dict = active_run.get("stages", {})
+        for stg in stage_names:
+            stg_info = stages_dict.get(stg, {})
+            status = stg_info.get("status")
+            if status and inv_status.get(stg.lower()) == "NOT_STARTED":
+                inv_status[stg.lower()] = status
+            if status == "COMPLETED" and stg_info.get("output") and stg.lower() not in inv_reports:
+                inv_reports[stg.lower()] = stg_info["output"]
+                inv_status[stg.lower()] = "COMPLETED"
+
+    # 3. Check store for persisted investigation reports
+    store_reports = store.get("investigation_reports", {})
+    if isinstance(store_reports, dict):
+        for stg in stage_names:
+            stg_lower = stg.lower()
+            if stg_lower in inv_reports:
+                continue
+
+            # Check key format: f"{case_id}::{stg}"
+            key = f"{case_id}::{stg}"
+            rpt_rec = store_reports.get(key)
+            if rpt_rec and isinstance(rpt_rec, dict) and rpt_rec.get("report_data"):
+                inv_reports[stg_lower] = rpt_rec["report_data"]
+                inv_status[stg_lower] = "COMPLETED"
+            else:
+                for r in store_reports.values():
+                    if isinstance(r, dict) and r.get("case_id") == case_id and r.get("report_type") == stg:
+                        if r.get("report_data"):
+                            inv_reports[stg_lower] = r["report_data"]
+                            inv_status[stg_lower] = "COMPLETED"
+                            break
+
+    # 4. Check case object for attached reports or stages
+    case_stages = case.get("stages") or case.get("investigation_stages") or []
+    if isinstance(case_stages, list):
+        for s in case_stages:
+            if isinstance(s, dict):
+                stg_name = str(s.get("stage", "")).lower()
+                if stg_name in inv_status:
+                    if s.get("status") and inv_status[stg_name] == "NOT_STARTED":
+                        inv_status[stg_name] = s["status"]
+                    if s.get("output") and stg_name not in inv_reports:
+                        inv_reports[stg_name] = s["output"]
+                        inv_status[stg_name] = "COMPLETED"
+
+    # 5. Deterministic fallback for EVIDENCE collection stage if report is missing
+    if "evidence" not in inv_reports:
+        if case.get("evidence") and isinstance(case["evidence"], dict) and case["evidence"].get("evidence"):
+            inv_reports["evidence"] = case["evidence"]
+            inv_status["evidence"] = "COMPLETED"
+        else:
+            try:
+                ev_pkg = collect_evidence_for_case(case_id, store)
+                if ev_pkg and ev_pkg.get("found") and ev_pkg.get("evidence"):
+                    inv_reports["evidence"] = ev_pkg
+                    inv_status["evidence"] = "COMPLETED"
+            except Exception:
+                pass
+
+    # Ensure consistency between loaded reports and status
+    for stg_lower in inv_status:
+        if stg_lower in inv_reports and inv_status[stg_lower] in ("NOT_STARTED", "PENDING"):
+            inv_status[stg_lower] = "COMPLETED"
+
+    # Stage synthesis tracking
+    synthesized_stages = [
+        s.upper() for s in stage_names
+        if s.lower() in inv_reports and inv_status.get(s.lower()) == "COMPLETED"
+    ]
+    missing_stages = [
+        s.upper() for s in stage_names
+        if s.upper() not in synthesized_stages
+    ]
+
     return {
         "case_id": case_id,
         "risk_level": str(case.get("risk_level", "UNKNOWN")),
@@ -139,6 +272,10 @@ def _build_investigation_context(
         "transaction_flows": flow_lines,
         "detected_patterns": detected_patterns,
         "policy_decision_summary": policy_summary,
+        "investigation_status": inv_status,
+        "investigation_reports": inv_reports,
+        "synthesized_stages": synthesized_stages,
+        "missing_stages": missing_stages,
     }
 
 
@@ -165,12 +302,15 @@ async def intelligence_health() -> HealthResponse:
 
 
 @router.post("/analyze", response_model=IntelligenceResult)
-async def analyze_case(req: AnalyzeRequest) -> IntelligenceResult:
+async def analyze_case(
+    req: AnalyzeRequest,
+    repo: AbstractCaseRepository = Depends(get_repository),
+) -> IntelligenceResult:
     """
-    Phase 3: Run Qwen advisory investigation analysis for the given case.
+    Phase 3 & 9: Run Qwen advisory investigation analysis for the given case.
 
     Data flow:
-      Case store → Context builder → Qwen → Structured advisory output
+      Case store / DB → Context builder (5-Agent Reports) → Qwen → Structured advisory output
 
     NEVER flows into:
       Policy engine / Action executor / Freeze logic / Audit mutation
@@ -184,16 +324,28 @@ async def analyze_case(req: AnalyzeRequest) -> IntelligenceResult:
     """
     case_id = req.case_id
 
-    # Validate case exists
-    if case_id not in data_store.get("cases", {}):
+    # Validate case exists in repo or store
+    case_exists = False
+    if repo is not None:
+        try:
+            case_obj = await repo.get_case(case_id)
+            if case_obj:
+                case_exists = True
+        except Exception:
+            pass
+
+    if not case_exists:
+        case_exists = case_id in data_store.get("cases", {})
+
+    if not case_exists:
         return IntelligenceResult(
             status="no_data",
             case_id=case_id,
             error_detail=f"Case {case_id!r} not found in SENTINEL data store.",
         )
 
-    # Build sanitized context (Phase 10 data boundary)
-    ctx = _build_investigation_context(case_id, data_store)
+    # Build sanitized context with the 5 deterministic investigation reports
+    ctx = await _build_investigation_context(case_id, data_store, repo=repo)
     if not ctx:
         return IntelligenceResult(
             status="no_data",

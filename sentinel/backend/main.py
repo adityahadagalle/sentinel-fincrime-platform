@@ -39,26 +39,7 @@ from app.services.investigation_orchestrator import investigation_orchestrator
 from fastapi.middleware.cors import CORSMiddleware
 
 
-def get_repository(
-    session: Optional[AsyncSession] = Depends(get_db_session)
-) -> AbstractCaseRepository:
-    """
-    FastAPI Dependency Provider for AbstractCaseRepository (Phase 8 Step 1).
-    - If AsyncSession is active: returns PostgreSQLCaseRepository(session).
-    - If AsyncSession is None and in dev/test mode: returns InMemoryCaseRepository(data_store).
-    - If in production mode or PostgreSQL configured but session is None: FAILS FAST (raises RuntimeError).
-    """
-    sentinel_mode = os.getenv("SENTINEL_MODE", "development").lower()
-    db_url = os.getenv("DATABASE_URL")
-    is_postgres_env = bool(db_url and db_url.startswith("postgresql"))
-
-    if session is not None:
-        return PostgreSQLCaseRepository(session)
-
-    if sentinel_mode == "production" or is_postgres_env:
-        raise RuntimeError("POSTGRESQL PERSISTENCE FAILURE: Database session unavailable in production mode.")
-
-    return InMemoryCaseRepository(data_store)
+from app.repositories.dependencies import get_repository
 
 
 

@@ -496,3 +496,369 @@ class TestExistingSystemsUnaffected:
         svc = OllamaService()
         # No shared callable reference
         assert evaluate_autonomous_policy is not svc.analyze
+
+
+# ── TEST 11: 5-AGENT INVESTIGATION SYNTHESIS ─────────────────────────────────
+
+MOCK_5_STAGE_REPORTS = {
+    "EVIDENCE": {
+        "found": True,
+        "summary": {
+            "total_evidence_items": 4,
+            "high_severity_items": 2,
+            "medium_severity_items": 1,
+            "categories_covered": ["TRANSACTION", "VELOCITY", "GRAPH"]
+        },
+        "evidence": [
+            {
+                "id": "EV-001",
+                "category": "TRANSACTION",
+                "severity": "HIGH",
+                "finding": "High-value pass-through transfer of ₹1,25,000",
+                "source": "transaction_monitor"
+            },
+            {
+                "id": "EV-002",
+                "category": "VELOCITY",
+                "severity": "HIGH",
+                "finding": "Funds drained within 45 seconds of receipt",
+                "source": "velocity_engine"
+            }
+        ]
+    },
+    "CONTEXTUAL": {
+        "found": True,
+        "summary": {
+            "contextual_severity": "HIGH",
+            "confidence": 0.94,
+            "pattern_count": 1
+        },
+        "patterns": [
+            {
+                "pattern_id": "CP-PASS-THROUGH",
+                "name": "Pass-Through Account Drainage",
+                "severity": "HIGH",
+                "confidence": 0.94,
+                "description": "Rapid pass-through pattern detected consistent with mule relay behavior.",
+                "supporting_evidence_ids": ["EV-001", "EV-002"]
+            }
+        ],
+        "contextual_findings": [
+            {
+                "id": "CTX-001",
+                "type": "pattern",
+                "severity": "HIGH",
+                "finding": "Account displays mule node characteristics.",
+                "supporting_evidence_ids": ["EV-001"]
+            }
+        ]
+    },
+    "REGULATORY": {
+        "found": True,
+        "summary": {
+            "regulatory_severity": "CRITICAL",
+            "assessment_heuristic_index": 0.88,
+            "indicator_count": 1,
+            "jurisdiction_context": "INDIAN_FINANCIAL_SYSTEM_SIMULATION"
+        },
+        "regulatory_indicators": [
+            {
+                "id": "REG-001",
+                "code": "PMLA_SUSPICIOUS_PATTERN",
+                "severity": "CRITICAL",
+                "regulatory_framework": "PMLA_2002",
+                "reporting_implication": "STR_MANDATORY_REVIEW",
+                "description": "Unusual fund velocity with layering exceeds PMLA suspicious activity threshold."
+            }
+        ],
+        "compliance_considerations": [
+            {
+                "code": "STR_FILING",
+                "recommendation": "Prepare Suspicious Transaction Report (STR) for FIU-IND review within statutory timeframe."
+            }
+        ]
+    },
+    "AUDIT_EXPLANATION": {
+        "found": True,
+        "executive_summary": "Comprehensive deterministic investigation reveals coordinated rapid layering across 3 hops.",
+        "summary": {
+            "regulatory_severity": "CRITICAL",
+            "traceability_status": "VERIFIED_COMPLETE"
+        },
+        "investigation_narrative": [
+            {
+                "step_number": 1,
+                "title": "Initial Deposit & Rapid Hop",
+                "description": "Source victim deposited ₹1,25,000 into intermediate mule account."
+            }
+        ],
+        "key_findings": [
+            {
+                "finding_id": "KF-001",
+                "statement": "Confirmed high-confidence mule relay signature with 94% pattern confidence.",
+                "severity": "HIGH"
+            }
+        ],
+        "uncertainties": [],
+        "data_gaps": []
+    },
+    "DECISION_SUPPORT": {
+        "found": True,
+        "summary": {
+            "review_priority": "URGENT",
+            "requires_human_approval": True
+        },
+        "review_priority": "URGENT",
+        "priority_rationale": "High-risk pass-through transfer in progress with active cashout risk.",
+        "analyst_executive_brief": "Urgent operator intervention recommended to review exit nodes prior to ATM cashout.",
+        "recommended_review_steps": [
+            {
+                "step_id": "STEP-01",
+                "action": "Verify beneficiary identity with partner bank",
+                "rationale": "Confirm if account holder is a known synthetic or compromised identity.",
+                "priority": "URGENT"
+            }
+        ],
+        "disposition_options": [
+            {
+                "action_code": "FREEZE_CONFIRM",
+                "label": "Confirm Temporary Administrative Freeze",
+                "description": "Halt further outbound transfers pending KYC re-verification.",
+                "recommended": True
+            }
+        ],
+        "human_approval_boundary": {
+            "autonomous_execution": False,
+            "required_role": "COMPLIANCE_ANALYST"
+        }
+    }
+}
+
+
+class TestQwenFiveAgentSynthesis:
+    """
+    Tests for Qwen advisory synthesis of the 5 deterministic investigation agents.
+    """
+
+    @pytest.mark.asyncio
+    async def test_context_builder_retrieves_all_5_reports_when_present(self):
+        """When all 5 reports exist in the repository/store, context builder retrieves all 5."""
+        from app.routes.intelligence import _build_investigation_context
+        from app.repositories.in_memory import InMemoryCaseRepository
+        from app.core.data_store import data_store
+
+        case_id = "CASE-SYNTH-ALL-5"
+        data_store.setdefault("cases", {})[case_id] = {
+            "case_id": case_id,
+            "primary_tx_id": "TX-SYNTH-01",
+            "risk_level": "CRITICAL",
+            "risk_score": 95,
+            "topology_type": "MULTI_HOP_DAG",
+            "transactions": ["TX-SYNTH-01"],
+        }
+        data_store.setdefault("transactions", {})["TX-SYNTH-01"] = {
+            "tx_id": "TX-SYNTH-01",
+            "amount": 125000,
+            "channel": "UPI",
+            "risk_score": 95,
+            "reason": "Mule drainage",
+        }
+
+        repo = InMemoryCaseRepository(data_store)
+        for stg, rpt_data in MOCK_5_STAGE_REPORTS.items():
+            await repo.save_investigation_report({
+                "case_id": case_id,
+                "report_type": stg,
+                "report_data": rpt_data,
+            })
+
+        ctx = await _build_investigation_context(case_id, data_store, repo=repo)
+
+        assert ctx["case_id"] == case_id
+        assert "investigation_reports" in ctx
+        assert len(ctx["investigation_reports"]) == 5
+        assert set(ctx["synthesized_stages"]) == {
+            "EVIDENCE", "CONTEXTUAL", "REGULATORY", "AUDIT_EXPLANATION", "DECISION_SUPPORT"
+        }
+        assert ctx["missing_stages"] == []
+
+        # Verify all 5 stages marked COMPLETED in status
+        for stg in ["evidence", "contextual", "regulatory", "audit_explanation", "decision_support"]:
+            assert ctx["investigation_status"][stg] == "COMPLETED"
+
+        # Verify Ollama user message serializes all 5 stages
+        svc = OllamaService()
+        msg = svc._build_user_message(ctx)
+        assert "[STAGE 1: EVIDENCE COLLECTION FINDINGS]" in msg
+        assert "[STAGE 2: CONTEXTUAL INVESTIGATION FINDINGS]" in msg
+        assert "[STAGE 3: REGULATORY RISK ASSESSMENT FINDINGS]" in msg
+        assert "[STAGE 4: AUDIT EXPLANATION FINDINGS]" in msg
+        assert "[STAGE 5: ANALYST DECISION SUPPORT FINDINGS]" in msg
+        assert "Pass-Through Account Drainage" in msg
+        assert "PMLA_SUSPICIOUS_PATTERN" in msg
+        assert "Verify beneficiary identity with partner bank" in msg
+
+        # Cleanup
+        data_store.get("cases", {}).pop(case_id, None)
+        data_store.get("transactions", {}).pop("TX-SYNTH-01", None)
+
+    @pytest.mark.asyncio
+    async def test_context_builder_handles_partial_investigation_cleanly(self):
+        """When only some stages are complete, context accurately flags missing stages without error."""
+        from app.routes.intelligence import _build_investigation_context
+        from app.repositories.in_memory import InMemoryCaseRepository
+        from app.core.data_store import data_store
+
+        case_id = "CASE-SYNTH-PARTIAL"
+        data_store.setdefault("cases", {})[case_id] = {
+            "case_id": case_id,
+            "primary_tx_id": "TX-SYNTH-02",
+            "risk_level": "HIGH",
+            "risk_score": 75,
+            "topology_type": "LINEAR_CHAIN",
+            "transactions": ["TX-SYNTH-02"],
+        }
+        data_store.setdefault("transactions", {})["TX-SYNTH-02"] = {
+            "tx_id": "TX-SYNTH-02",
+            "amount": 50000,
+            "channel": "IMPS",
+            "risk_score": 75,
+            "reason": "Rapid hop",
+        }
+
+        repo = InMemoryCaseRepository(data_store)
+        # Only save EVIDENCE and CONTEXTUAL reports
+        await repo.save_investigation_report({
+            "case_id": case_id,
+            "report_type": "EVIDENCE",
+            "report_data": MOCK_5_STAGE_REPORTS["EVIDENCE"],
+        })
+        await repo.save_investigation_report({
+            "case_id": case_id,
+            "report_type": "CONTEXTUAL",
+            "report_data": MOCK_5_STAGE_REPORTS["CONTEXTUAL"],
+        })
+
+        ctx = await _build_investigation_context(case_id, data_store, repo=repo)
+
+        assert set(ctx["synthesized_stages"]) == {"EVIDENCE", "CONTEXTUAL"}
+        assert set(ctx["missing_stages"]) == {"REGULATORY", "AUDIT_EXPLANATION", "DECISION_SUPPORT"}
+
+        # Verify missing stages warning in user message
+        svc = OllamaService()
+        msg = svc._build_user_message(ctx)
+        assert "[STAGE 1: EVIDENCE COLLECTION FINDINGS]" in msg
+        assert "[STAGE 2: CONTEXTUAL INVESTIGATION FINDINGS]" in msg
+        assert "--- INCOMPLETE / PENDING / MISSING INVESTIGATION STAGES ---" in msg
+        assert "[STAGE: REGULATORY] Stage NOT COMPLETED" in msg
+        assert "[STAGE: AUDIT_EXPLANATION] Stage NOT COMPLETED" in msg
+        assert "[STAGE: DECISION_SUPPORT] Stage NOT COMPLETED" in msg
+
+        # Cleanup
+        data_store.get("cases", {}).pop(case_id, None)
+        data_store.get("transactions", {}).pop("TX-SYNTH-02", None)
+
+    @pytest.mark.asyncio
+    async def test_context_builder_handles_no_reports_cleanly(self):
+        """When no investigation reports exist, context builder still produces valid context without crash."""
+        from app.routes.intelligence import _build_investigation_context
+        from app.repositories.in_memory import InMemoryCaseRepository
+        from app.core.data_store import data_store
+
+        case_id = "CASE-SYNTH-EMPTY"
+        data_store.setdefault("cases", {})[case_id] = {
+            "case_id": case_id,
+            "primary_tx_id": "TX-SYNTH-03",
+            "risk_level": "LOW",
+            "risk_score": 20,
+            "topology_type": "UNKNOWN",
+            "transactions": [],
+        }
+
+        repo = InMemoryCaseRepository(data_store)
+        ctx = await _build_investigation_context(case_id, data_store, repo=repo)
+
+        assert ctx["case_id"] == case_id
+        # Missing stages should account for uncompleted stages
+        assert "REGULATORY" in ctx["missing_stages"]
+        assert "AUDIT_EXPLANATION" in ctx["missing_stages"]
+        assert "DECISION_SUPPORT" in ctx["missing_stages"]
+
+        # Cleanup
+        data_store.get("cases", {}).pop(case_id, None)
+
+    def test_system_prompt_instructs_5_stage_synthesis_and_boundaries(self):
+        """Verify system prompt explicitly names the 5 stages and reinforces advisory-only constraints."""
+        from app.services.ollama_service import SENTINEL_SYSTEM_PROMPT
+
+        # 5 stage names must be mentioned
+        assert "Evidence Collection" in SENTINEL_SYSTEM_PROMPT
+        assert "Contextual Investigation" in SENTINEL_SYSTEM_PROMPT
+        assert "Regulatory Risk Assessment" in SENTINEL_SYSTEM_PROMPT
+        assert "Audit Explanation" in SENTINEL_SYSTEM_PROMPT
+        assert "Analyst Decision Support" in SENTINEL_SYSTEM_PROMPT
+
+        # Strict advisory boundaries must be enforced
+        assert "NOT the policy engine" in SENTINEL_SYSTEM_PROMPT
+        assert "NOT the action executor" in SENTINEL_SYSTEM_PROMPT
+        assert "CANNOT freeze" in SENTINEL_SYSTEM_PROMPT
+        assert "CANNOT override deterministic SENTINEL policy decisions" in SENTINEL_SYSTEM_PROMPT
+        assert "ADVISORY INTELLIGENCE ONLY" in SENTINEL_SYSTEM_PROMPT
+
+        # Distinction between verified system findings and AI interpretation
+        assert "verified system findings" in SENTINEL_SYSTEM_PROMPT.lower()
+        assert "ai synthesis" in SENTINEL_SYSTEM_PROMPT.lower()
+        assert "recommended_investigation_steps" in SENTINEL_SYSTEM_PROMPT
+
+    def test_intelligence_result_contains_synthesized_and_missing_stages(self):
+        """Verify IntelligenceResult envelope exposes synthesized_stages and missing_stages."""
+        r = IntelligenceResult(
+            status="ready",
+            case_id="CASE-001",
+            synthesized_stages=["EVIDENCE", "CONTEXTUAL"],
+            missing_stages=["REGULATORY", "AUDIT_EXPLANATION", "DECISION_SUPPORT"]
+        )
+        assert r.synthesized_stages == ["EVIDENCE", "CONTEXTUAL"]
+        assert r.missing_stages == ["REGULATORY", "AUDIT_EXPLANATION", "DECISION_SUPPORT"]
+
+    def test_post_analyze_endpoint_returns_synthesized_stages(self):
+        """Verify POST /intelligence/analyze returns synthesized_stages and missing_stages."""
+        from fastapi.testclient import TestClient
+        import main as app_module
+        from app.core.data_store import data_store
+
+        case_id = "CASE-API-SYNTH"
+        data_store.setdefault("cases", {})[case_id] = {
+            "case_id": case_id,
+            "primary_tx_id": "TX-01",
+            "risk_level": "HIGH",
+            "risk_score": 80,
+            "topology_type": "MULTI_HOP_DAG",
+            "transactions": [],
+        }
+
+        def mock_analyze(ctx, case_id=None):
+            return IntelligenceResult(
+                status="ready",
+                case_id=case_id,
+                synthesized_stages=ctx.get("synthesized_stages", []),
+                missing_stages=ctx.get("missing_stages", []),
+                analysis=AIAnalysisResponse(
+                    **VALID_ANALYSIS_DICT,
+                    synthesized_stages=ctx.get("synthesized_stages", []),
+                    missing_stages=ctx.get("missing_stages", [])
+                ),
+            )
+
+        client = TestClient(app_module.app, raise_server_exceptions=False)
+        with patch("app.routes.intelligence.ollama_service.analyze", side_effect=mock_analyze):
+            resp = client.post("/intelligence/analyze", json={"case_id": case_id})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ready"
+        assert "synthesized_stages" in data
+        assert "missing_stages" in data
+
+        # Cleanup
+        data_store.get("cases", {}).pop(case_id, None)
