@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* SENTINEL dark SOC palette from friend's exact reference */
+  --background: 222 47% 4%;        /* #080D18 Deep dark navy */
+  --foreground: 210 40% 98%;       /* #F8FAFC Clean primary text */
+  --card: 220 42% 7%;              /* #0C1424 Dark navy surface */
+  --card-foreground: 210 40% 98%;
+  --popover: 220 42% 7%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 91% 60%;          /* #3B82F6 Electric blue accent */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 219 38% 11%;        /* #0E1A2C Slate dark surface */
+  --secondary-foreground: 210 40% 98%;
+  --muted: 219 38% 11%;
+  --muted-foreground: 215 20% 55%; /* #7C8CA0 Slate metadata */
+  --accent: 219 38% 13%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 84% 60%;        /* #EF4444 Critical red */
+  --destructive-foreground: 210 40% 98%;
+  --border: 218 37% 16%;           /* #1A2640 Subtle border */
+  --input: 218 37% 14%;
+  --ring: 217 91% 60%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 selection:text-primary-foreground;
+  }
+}
+
+/* Custom subtle scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Animation for new row arrival in stream */
+@keyframes newRowEntry {
+  0% {
+    background-color: rgba(56, 189, 248, 0.18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-new-row {
+  animation: newRowEntry 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

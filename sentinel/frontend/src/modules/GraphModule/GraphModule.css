@@ -1,0 +1,58 @@
+/* ── SENTINEL TERMINAL — GRAPH MODULE CSS ─────────────────────────────────────
+   Sentinel Visual Design System
+   Fonts: JetBrains Mono (data/IDs/metrics), Hanken Grotesk (UI labels)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ── CYTOSCAPE CANVAS ──────────────────────────────────────────────────────── */
+.graph-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.graph-canvas canvas {
+  left: 0 !important;
+}
+
+/* ── SCROLLBAR OVERRIDE ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track { background: #020617; }
+::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* ── GRAPH HOVER GLOW ───────────────────────────────────────────────────────── */
+.sentinel-ctrl-btn {
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.sentinel-ctrl-btn:hover {
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+
+/* ── LIVE PULSE ANIMATION ───────────────────────────────────────────────────── */
+@keyframes sentinel-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.sentinel-pulse { animation: sentinel-pulse 1.6s ease-in-out infinite; }
+
+/* ── TOAST SLIDE-IN ─────────────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+.sentinel-toast { animation: slideInRight 0.25s ease-out; }
+
+/* ── DOT GRID BACKGROUND ────────────────────────────────────────────────────── */
+.sentinel-dot-grid {
+  background-color: #060B14;
+  background-image: radial-gradient(circle, #19273D 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
