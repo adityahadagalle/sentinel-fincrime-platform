@@ -26,6 +26,8 @@ const Feed = () => {
   const [riskFilter, setRiskFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [autonomyMode, setAutonomyMode] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   const previousTxIdsRef = useRef(new Set());
   const role = getRole();
@@ -256,6 +258,19 @@ const Feed = () => {
       .slice(0, 150);
   }, [transactions, channelFilter, riskFilter, searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [channelFilter, riskFilter, searchQuery]);
+
+  const totalFilteredCount = filteredTransactions.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / pageSize));
+  const startIdx = totalFilteredCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endIdx = Math.min(currentPage * pageSize, totalFilteredCount);
+
+  const paginatedTransactions = useMemo(() => {
+    return filteredTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filteredTransactions, currentPage, pageSize]);
+
   const handleTxClick = (tx) => {
     const relatedCase = cases.find(c => c.case_id === tx.case_id);
     const relatedActions = actions.filter(a => a.case_id === tx.case_id);
@@ -267,7 +282,7 @@ const Feed = () => {
 
       {/* ══════ 1. TOP HEADER / KPI BAR (EXACT FRIEND'S DESIGN) ══════ */}
       <header className="px-8 py-5 border-b border-border/80 bg-card/60 backdrop-blur-md shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-[1720px] w-full mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight text-slate-100 font-sans">
@@ -317,7 +332,7 @@ const Feed = () => {
 
       {/* ══════ 2. MAIN TABLE CONTAINER ══════ */}
       <div className="flex-1 overflow-auto p-6 md:p-8">
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="max-w-[1720px] w-full mx-auto space-y-4">
 
           {/* Controls & Filter Toolbar */}
           <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-border/80 bg-card/80 backdrop-blur-md shadow-lg flex-wrap">
@@ -386,23 +401,23 @@ const Feed = () => {
           {filteredTransactions.length > 0 ? (
             <div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-2xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1050px]">
+                <table className="w-full text-left border-collapse min-w-[1450px]">
                   <thead>
                     <tr className="bg-muted/60 text-[10px] uppercase tracking-wider font-semibold text-slate-400 border-b border-border/80 select-none">
-                      <th className="py-3 px-4 whitespace-nowrap">Tx ID</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Time</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Channel</th>
-                      <th className="py-3 px-4 whitespace-nowrap">Sender → Receiver</th>
-                      <th className="py-3 px-4 text-right whitespace-nowrap">Amount</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Risk Score</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Policy Action</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Execution Status / Controls</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Account</th>
-                      <th className="py-3 px-4 text-left whitespace-nowrap min-w-[220px]">Anomaly Indicator</th>
+                      <th className="py-3 px-4 whitespace-nowrap min-w-[140px]">Tx ID</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap min-w-[90px]">Time</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap min-w-[85px]">Channel</th>
+                      <th className="py-3 px-4 whitespace-nowrap min-w-[210px]">Sender → Receiver</th>
+                      <th className="py-3 px-4 text-right whitespace-nowrap min-w-[110px]">Amount</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap min-w-[130px]">Risk Score</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap min-w-[140px]">Policy Action</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap min-w-[200px]">Execution Status / Controls</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap min-w-[110px]">Account</th>
+                      <th className="py-3 px-4 text-left whitespace-nowrap min-w-[300px]">Anomaly Indicator</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTransactions.map((tx) => {
+                    {paginatedTransactions.map((tx) => {
                       const dec = tx.response_decision || {};
                       const rec = tx.execution_record || {};
                       const rawScore = Number(tx.risk_score || 0);
@@ -585,10 +600,10 @@ const Feed = () => {
                           </td>
 
                           {/* Anomaly Indicator (CRITICAL REQUIREMENT PRESERVED) */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 min-w-[300px]">
                             {tx.reason ? (
                               <span
-                                className={`text-xs font-mono truncate max-w-[240px] block font-medium ${
+                                className={`text-xs font-mono font-medium leading-relaxed whitespace-normal break-words max-w-[340px] block ${
                                   rawScore >= 85
                                     ? 'text-rose-400 font-semibold'
                                     : rawScore >= 70
@@ -612,6 +627,44 @@ const Feed = () => {
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Table Footer / Pagination */}
+              <div className="flex items-center justify-between px-6 py-3.5 bg-muted/40 border-t border-border/80 text-xs font-mono text-slate-400 select-none flex-wrap gap-3">
+                <div>
+                  Showing <span className="text-slate-200 font-semibold">{startIdx}</span> to <span className="text-slate-200 font-semibold">{endIdx}</span> of <span className="text-slate-200 font-semibold">{totalFilteredCount}</span> transactions
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded-lg bg-slate-800/80 border border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-mono"
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))
+                    .map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded-lg border text-xs font-mono transition-all ${
+                          currentPage === page
+                            ? 'bg-primary text-white border-primary font-bold shadow-sm'
+                            : 'bg-slate-800/60 text-slate-300 border-slate-700/80 hover:bg-slate-700'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="px-3 py-1 rounded-lg bg-slate-800/80 border border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-mono"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
