@@ -1,9 +1,9 @@
 /* ── SENTINEL TERMINAL — GRAPH MODULE CSS ─────────────────────────────────────
-   Sentinel Visual Design System
+   SENTINEL Terminal design system (generated via Stitch MCP)
    Fonts: JetBrains Mono (data/IDs/metrics), Hanken Grotesk (UI labels)
    ─────────────────────────────────────────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 /* ── CYTOSCAPE CANVAS ──────────────────────────────────────────────────────── */
 .graph-canvas {
@@ -12,7 +12,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: transparent;
+  background: #0B132B;
 }
 
 .graph-canvas canvas {
@@ -28,7 +28,7 @@
 ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
-/* ── GRAPH HOVER GLOW ───────────────────────────────────────────────────────── */
+/* ── GRAPH HOVER GLOW (SENTINEL TERMINAL INTERACTIVE RULE) ─────────────────── */
 .sentinel-ctrl-btn {
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
@@ -52,7 +52,6 @@
 
 /* ── DOT GRID BACKGROUND ────────────────────────────────────────────────────── */
 .sentinel-dot-grid {
-  background-color: #060B14;
-  background-image: radial-gradient(circle, #19273D 1.2px, transparent 1.2px);
-  background-size: 22px 22px;
+  background-image: radial-gradient(circle, #1E293B 1px, transparent 1px);
+  background-size: 20px 20px;
 }

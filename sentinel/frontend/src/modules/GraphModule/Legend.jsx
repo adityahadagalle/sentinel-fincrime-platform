@@ -1,59 +1,43 @@
 import React from 'react';
 
-/**
- * Entity Geometries Legend Component
- * Standardized across SENTINEL design system.
- */
 const Legend = () => {
-  const entityTypes = [
-    { label: 'Victim Account', color: '#0A1A3C', border: '#2563EB', shape: 'rounded-full' },
-    { label: 'Mule Account', color: '#330808', border: '#DC2626', shape: 'rounded-sm' },
-    { label: 'Merchant Outlet', color: '#03261A', border: '#10B981', shape: 'rounded-sm' },
-    { label: 'UPI Handle', color: '#220B3D', border: '#9333EA', shape: 'rotate-45' },
-    { label: 'Cashout Terminal', color: '#331B03', border: '#F59E0B', shape: 'rounded-sm' }
+  const entityItems = [
+    { label: 'Source', symbol: '●', color: '#2563EB' },
+    { label: 'Mule', symbol: '⬢', color: '#DC2626' },
+    { label: 'Collector', symbol: '▣', color: '#D97706' },
+    { label: 'UPI', symbol: '◇', color: '#D97706' },
+    { label: 'Crypto', symbol: '⬡', color: '#7C3AED' },
+    { label: 'Merchant', symbol: '⌂', color: '#7C3AED' },
+    { label: 'Cashout', symbol: '⌬', color: '#DC2626' }
   ];
 
-  const lineTypes = [
-    { label: 'Suspicious Flow', color: '#EF4444', dashed: true },
-    { label: 'Standard Transfer', color: '#2563EB', dashed: false },
-    { label: 'Traced Active Route', color: '#38BDF8', dashed: false }
+  const flowItems = [
+    { label: 'Standard Transfer', style: '—', color: '#38BDF8' },
+    { label: 'Suspicious Flow', style: '- -', color: '#EF4444' },
+    { label: 'Traced Route', style: '━━', color: '#38BDF8' }
   ];
 
   return (
-    <div className="p-3 bg-[#060B14]/95 border border-[#1E2D4A] rounded-lg shadow-2xl backdrop-blur-md space-y-2.5 font-['JetBrains_Mono'] text-[10px] select-none max-w-[210px]">
+    <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-xl shadow-2xl backdrop-blur-md font-mono text-[11px] text-slate-300 w-52 space-y-2.5">
       <div>
-        <span className="text-[8.5px] font-bold uppercase tracking-[0.14em] text-slate-500 block mb-1.5 border-b border-[#1E2D4A] pb-1">
-          Entity Geometries
-        </span>
-        <div className="space-y-1.5">
-          {entityTypes.map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
-              <div
-                className={`w-3 h-3 ${item.shape} shrink-0 border`}
-                style={{ background: item.color, borderColor: item.border }}
-              />
-              <span className="text-[9.5px] text-slate-300 truncate">
-                {item.label}
-              </span>
+        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-800/80 pb-1">ENTITY TYPES</h4>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+          {entityItems.map((item) => (
+            <div key={item.label} className="flex items-center gap-1.5">
+              <span style={{ color: item.color }} className="font-bold text-xs">{item.symbol}</span>
+              <span className="text-slate-300 text-[10px]">{item.label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="pt-2 border-t border-[#1E2D4A]">
-        <span className="text-[8.5px] font-bold uppercase tracking-[0.14em] text-slate-500 block mb-1.5 border-b border-[#1E2D4A] pb-1">
-          Flow Paths
-        </span>
-        <div className="space-y-1.5">
-          {lineTypes.map((line) => (
-            <div key={line.label} className="flex items-center gap-2">
-              <div
-                className={`w-4 h-0.5 shrink-0 ${line.dashed ? 'border-b border-dashed border-red-500' : ''}`}
-                style={{ background: line.dashed ? 'transparent' : line.color }}
-              />
-              <span className="text-[9.5px] text-slate-300 truncate">
-                {line.label}
-              </span>
+      <div>
+        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-800/80 pb-1">FLOW TYPES</h4>
+        <div className="space-y-1">
+          {flowItems.map((item) => (
+            <div key={item.label} className="flex items-center justify-between">
+              <span className="text-slate-400 text-[10px]">{item.label}</span>
+              <span style={{ color: item.color }} className="font-bold text-[10px] font-mono">{item.style}</span>
             </div>
           ))}
         </div>

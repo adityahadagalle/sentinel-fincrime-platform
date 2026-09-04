@@ -53,6 +53,12 @@ async def lifespan(app: FastAPI):
     if sentinel_mode == "production" and not db_url:
         raise RuntimeError("PRODUCTION CONFIGURATION FAILURE: DATABASE_URL environment variable is required in production mode.")
 
+    try:
+        from app.core.seed_data import seed_initial_demonstration_data
+        seed_initial_demonstration_data(data_store)
+    except Exception as e:
+        print(f"[SENTINEL] Seed data initialization error: {e}")
+
     loop_task = asyncio.create_task(_baseline_loop())
     yield
     loop_task.cancel()
@@ -1973,10 +1979,13 @@ async def get_analytics_overview(
     }
 
     # 3b. Investigation Confidence Telemetry (Tier 04 Investigation Performance)
-    tf_tx_ids = {t.get("tx_id") for t in tx_list}
+    tf_tx_ids = {t.get("tx_id") for t in tx_list if isinstance(t, dict)}
     active_cases = [
         c for c in cases_list
-        if c.get("primary_tx_id") in tf_tx_ids or any(tx.get("tx_id") in tf_tx_ids for tx in c.get("transactions", []))
+        if c.get("primary_tx_id") in tf_tx_ids or any(
+            (tx.get("tx_id") if isinstance(tx, dict) else tx) in tf_tx_ids
+            for tx in c.get("transactions", [])
+        )
     ] if tx_list else cases_list
     if not active_cases and cases_list:
         active_cases = cases_list
@@ -2837,7 +2846,7 @@ async def _baseline_loop():
     await asyncio.sleep(0.5)
     while True:
         try:
-            pattern = random.choices(["DIRECT", "LINEAR", "FAN_IN", "FAN_OUT"], weights=[40, 20, 20, 20])[0]
+            pattern = random.choices(["DIRECT", "LINEAR", "FAN_OUT", "FRAUD_6PLUS"], weights=[30, 25, 25, 20])[0]
 
             if pattern == "DIRECT":
                 tier = random.choices(["LOW", "MEDIUM", "HIGH"], weights=[65, 25, 10])[0]
@@ -2967,7 +2976,7 @@ async def _baseline_loop():
                 }
                 await _process_and_broadcast_tx(tx3)
 
-            else: # FAN_OUT
+            elif pattern == "FAN_OUT":
                 # 4 entities: 1 Origin -> 1 Mule Hub -> 2 Endpoints
                 chain_id = f"CHAIN-{uuid4().hex[:8].upper()}"
                 case_id = f"CASE-{chain_id[6:]}"
@@ -3029,6 +3038,50 @@ async def _baseline_loop():
                     "risk_score": 88
                 }
                 await _process_and_broadcast_tx(tx3)
+
+            else: # FRAUD_6PLUS
+                # 6 entities across 5 hops: Victim -> Mule 1 -> Mule 2 -> UPI Gateway -> Cashout Terminal -> Settlement Merchant
+                chain_id = f"CHAIN-{uuid4().hex[:8].upper()}"
+                case_id = f"CASE-{chain_id[6:]}"
+                root_tx_id = f"TX-{uuid4().hex[:8].upper()}"
+                v_id = f"ACC-USR-{random.randint(1000, 9999)}"
+                m1_id = f"ACC-MULE-{random.randint(1000, 9999)}"
+                m2_id = f"ACC-MULE-{random.randint(1000, 9999)}"
+                upi_id = f"UPI-HUB-{random.randint(1000, 9999)}"
+                cash_id = f"CASHOUT-ATM-{random.randint(1000, 9999)}"
+                merch_id = f"ACC-MERCH-{random.randint(1000, 9999)}"
+
+                base_amt = round(random.uniform(220000, 450000), 2)
+                f_hops = [
+                    (root_tx_id, None, v_id, m1_id, base_amt, "NEFT", 1, 80),
+                    (f"TX-{uuid4().hex[:8].upper()}", root_tx_id, m1_id, m2_id, round(base_amt * 0.96, 2), "IMPS", 2, 85),
+                    (f"TX-{uuid4().hex[:8].upper()}", None, m2_id, upi_id, round(base_amt * 0.92, 2), "UPI", 3, 90),
+                    (f"TX-{uuid4().hex[:8].upper()}", None, upi_id, cash_id, round(base_amt * 0.88, 2), "CARD", 4, 94),
+                    (f"TX-{uuid4().hex[:8].upper()}", None, cash_id, merch_id, round(base_amt * 0.85, 2), "NEFT", 5, 98),
+                ]
+                prev_id = root_tx_id
+                for idx, (tid, _, snd, rcv, amt, ch, hop, risk) in enumerate(f_hops):
+                    parent_id = root_tx_id if idx == 1 else (prev_id if idx > 1 else None)
+                    tx_item = {
+                        "tx_id": tid,
+                        "timestamp": _now_iso(),
+                        "case_id": case_id,
+                        "chain_id": chain_id,
+                        "root_transaction_id": root_tx_id,
+                        "parent_transaction_id": parent_id,
+                        "sender_account": snd,
+                        "receiver_account": rcv,
+                        "amount": amt,
+                        "currency": "INR",
+                        "channel": ch,
+                        "hop_number": hop,
+                        "total_hops": 5,
+                        "pattern_type": "MULE_CHAIN",
+                        "risk_score": risk
+                    }
+                    prev_id = tid
+                    await _process_and_broadcast_tx(tx_item)
+                    await asyncio.sleep(0.35)
 
 
         except asyncio.CancelledError:
