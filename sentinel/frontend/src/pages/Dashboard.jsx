@@ -1274,265 +1274,190 @@ const Dashboard = () => {
           <span>Deterministic 5-Stage Triage & Investigation Confidence Telemetry</span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-
-          {/* Left: Forensic Case Lifecycle Telemetry (6 cols) */}
-          <div className="lg:col-span-6 bg-[#0B132B]/90 border border-[#1E293B] p-5 rounded-xl shadow-xl flex flex-col justify-between space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1E293B] pb-3">
-              <div>
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-emerald-400" />
-                  Forensic Case Lifecycle Telemetry
-                </h2>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                  Real case throughput calculated from active case database records
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold uppercase">
-                  {investigationPerf?.resolution_rate ?? 0}% Resolution Rate
-                </span>
-              </div>
+        {/* Investigation Confidence Telemetry */}
+        <div className="bg-[#0B132B]/90 border border-[#1E293B] p-5 rounded-xl shadow-xl flex flex-col justify-between space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1E293B] pb-3">
+            <div>
+              <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-sky-400" />
+                Investigation Confidence
+              </h2>
+              <p className="text-[11px] text-slate-400 font-sans mt-0.5">
+                How strongly evidence supports the investigation conclusion
+              </p>
             </div>
-
-            {/* KPI Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono">
-              <div className="p-3 bg-[#060B15] rounded-xl border border-[#1E293B]">
-                <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Opened</span>
-                <span className="text-lg font-bold text-slate-100 mt-0.5 block">
-                  {investigationPerf ? investigationPerf.cases_opened.toLocaleString() : '—'}
+            <div>
+              {invConfidence?.status === 'AVAILABLE' ? (
+                <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded font-bold uppercase border ${
+                  (invConfidence.score ?? invConfidence.confidence_score) >= 85
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                    : (invConfidence.score ?? invConfidence.confidence_score) >= 60
+                    ? 'bg-sky-500/15 border-sky-500/30 text-sky-300'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                }`}>
+                  {invConfidence.label || invConfidence.confidence_level}
                 </span>
-                <span className="text-[8px] text-slate-500 block">Triggered cases</span>
-              </div>
-              <div className="p-3 bg-[#060B15] rounded-xl border border-[#1E293B]">
-                <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Investigated</span>
-                <span className="text-lg font-bold text-sky-400 mt-0.5 block">
-                  {investigationPerf ? investigationPerf.cases_investigated.toLocaleString() : '—'}
+              ) : (
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-400 uppercase">
+                  INSUFFICIENT DATA
                 </span>
-                <span className="text-[8px] text-slate-500 block">Pipeline ran</span>
-              </div>
-              <div className="p-3 bg-[#060B15] rounded-xl border border-[#1E293B]">
-                <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Escalated</span>
-                <span className="text-lg font-bold text-amber-400 mt-0.5 block">
-                  {investigationPerf ? investigationPerf.cases_escalated.toLocaleString() : '—'}
-                </span>
-                <span className="text-[8px] text-slate-500 block">High severity</span>
-              </div>
-              <div className="p-3 bg-[#060B15] rounded-xl border border-[#1E293B]">
-                <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Resolved</span>
-                <span className="text-lg font-bold text-emerald-400 mt-0.5 block">
-                  {investigationPerf ? investigationPerf.cases_resolved.toLocaleString() : '—'}
-                </span>
-                <span className="text-[8px] text-slate-500 block">Actioned/closed</span>
-              </div>
-            </div>
-
-            {/* Case Resolution Progress Bar */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                <span>CASE RESOLUTION PROGRESS</span>
-                <span>{investigationPerf ? `${investigationPerf.cases_resolved} / ${investigationPerf.cases_opened} cases` : '—'}</span>
-              </div>
-              <div className="w-full bg-[#060B15] h-2 rounded-full overflow-hidden border border-[#1E293B]">
-                <div 
-                  className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, Math.max(0, resolutionRate))}%` }} 
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between text-[9px] font-mono text-slate-500">
-              <span>ACTIVE PIPELINE: 5 AGENTS</span>
-              <span>DETERMINISTIC CASE TRIAGE</span>
+              )}
             </div>
           </div>
 
-          {/* Right: Investigation Confidence Telemetry (6 cols) */}
-          <div className="lg:col-span-6 bg-[#0B132B]/90 border border-[#1E293B] p-5 rounded-xl shadow-xl flex flex-col justify-between space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1E293B] pb-3">
-              <div>
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-sky-400" />
-                  Investigation Confidence
-                </h2>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                  How strongly evidence supports the investigation conclusion
-                </p>
-              </div>
-              <div>
-                {invConfidence?.status === 'AVAILABLE' ? (
-                  <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded font-bold uppercase border ${
-                    (invConfidence.score ?? invConfidence.confidence_score) >= 85
-                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                      : (invConfidence.score ?? invConfidence.confidence_score) >= 60
-                      ? 'bg-sky-500/15 border-sky-500/30 text-sky-300'
-                      : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                  }`}>
-                    {invConfidence.label || invConfidence.confidence_level}
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-400 uppercase">
-                    INSUFFICIENT DATA
-                  </span>
-                )}
-              </div>
+          {/* Prominent Callout: Explicit distinction from risk score with tooltip */}
+          <div className="group relative flex items-center justify-between px-3 py-2 rounded-lg bg-[#060B15] border border-sky-500/20 text-[10px] font-mono text-sky-300 cursor-help">
+            <div className="flex items-center gap-2">
+              <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <span>Evidence Support Index • Not Fraud Probability</span>
             </div>
+            <span className="text-[9px] text-slate-500 hidden sm:inline underline decoration-dotted">
+              Distinction Info
+            </span>
 
-            {/* Prominent Callout: Explicit distinction from risk score with tooltip */}
-            <div className="group relative flex items-center justify-between px-3 py-2 rounded-lg bg-[#060B15] border border-sky-500/20 text-[10px] font-mono text-sky-300 cursor-help">
-              <div className="flex items-center gap-2">
-                <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span>Evidence Support Index • Not Fraud Probability</span>
-              </div>
-              <span className="text-[9px] text-slate-500 hidden sm:inline underline decoration-dotted">
-                Distinction Info
+            {/* Tooltip on Hover */}
+            <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-30 w-72 p-2.5 rounded-lg bg-[#0B132B] border border-sky-500/30 shadow-2xl text-[11px] font-sans text-slate-300 pointer-events-none">
+              <span className="font-mono font-bold text-sky-400 block mb-1 text-xs">
+                INVESTIGATION CONFIDENCE
               </span>
-
-              {/* Tooltip on Hover */}
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-30 w-72 p-2.5 rounded-lg bg-[#0B132B] border border-sky-500/30 shadow-2xl text-[11px] font-sans text-slate-300 pointer-events-none">
-                <span className="font-mono font-bold text-sky-400 block mb-1 text-xs">
-                  INVESTIGATION CONFIDENCE
-                </span>
-                Measures how strongly the investigation is supported by available evidence completeness, agent agreement, source diversity, and identified contradictions.
-                <span className="block mt-1.5 text-amber-300/90 font-mono text-[10px]">
-                  Distinct from Risk Score: A high risk score with medium confidence indicates urgent suspicion where deeper evidence collection is still underway.
-                </span>
-              </div>
+              Measures how strongly the investigation is supported by available evidence completeness, agent agreement, source diversity, and identified contradictions.
+              <span className="block mt-1.5 text-amber-300/90 font-mono text-[10px]">
+                Distinct from Risk Score: A high risk score with medium confidence indicates urgent suspicion where deeper evidence collection is still underway.
+              </span>
             </div>
+          </div>
 
-            {(!invConfidence || invConfidence.status !== 'AVAILABLE' || invConfidence.cases_evaluated === 0) ? (
-              <div className="h-[150px] flex flex-col items-center justify-center text-center p-4 border border-dashed border-[#1E293B] rounded-xl bg-[#060B15]">
-                <AlertTriangle className="w-6 h-6 text-slate-500 mb-1.5" />
-                <span className="text-xs font-mono font-bold text-slate-400 uppercase">INSUFFICIENT INVESTIGATION RUNS</span>
-                <p className="text-[10px] text-slate-500 font-sans mt-1 max-w-sm">
-                  No completed 5-stage case investigations found in current timeframe ({timeframe}). Run case investigation in Investigation Workspace to generate confidence telemetry.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Confidence Hero Meter */}
-                {(() => {
-                  const scoreVal = invConfidence.score ?? invConfidence.confidence_score ?? 0;
-                  const scoreColor = scoreVal >= 85 ? 'text-emerald-400' : scoreVal >= 60 ? 'text-sky-400' : 'text-amber-400';
-                  const scoreBg = scoreVal >= 85 ? 'bg-emerald-500' : scoreVal >= 60 ? 'bg-sky-500' : 'bg-amber-500';
-                  const scoreGlow = scoreVal >= 85 ? 'shadow-[0_0_12px_rgba(16,185,129,0.35)]' : scoreVal >= 60 ? 'shadow-[0_0_12px_rgba(56,189,248,0.35)]' : 'shadow-[0_0_12px_rgba(245,158,11,0.35)]';
+          {(!invConfidence || invConfidence.status !== 'AVAILABLE' || invConfidence.cases_evaluated === 0) ? (
+            <div className="h-[150px] flex flex-col items-center justify-center text-center p-4 border border-dashed border-[#1E293B] rounded-xl bg-[#060B15]">
+              <AlertTriangle className="w-6 h-6 text-slate-500 mb-1.5" />
+              <span className="text-xs font-mono font-bold text-slate-400 uppercase">INSUFFICIENT INVESTIGATION RUNS</span>
+              <p className="text-[10px] text-slate-500 font-sans mt-1 max-w-sm">
+                No completed 5-stage case investigations found in current timeframe ({timeframe}). Run case investigation in Investigation Workspace to generate confidence telemetry.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Confidence Hero Meter */}
+              {(() => {
+                const scoreVal = invConfidence.score ?? invConfidence.confidence_score ?? 0;
+                const scoreColor = scoreVal >= 85 ? 'text-emerald-400' : scoreVal >= 60 ? 'text-sky-400' : 'text-amber-400';
+                const scoreBg = scoreVal >= 85 ? 'bg-emerald-500' : scoreVal >= 60 ? 'bg-sky-500' : 'bg-amber-500';
+                const scoreGlow = scoreVal >= 85 ? 'shadow-[0_0_12px_rgba(16,185,129,0.35)]' : scoreVal >= 60 ? 'shadow-[0_0_12px_rgba(56,189,248,0.35)]' : 'shadow-[0_0_12px_rgba(245,158,11,0.35)]';
 
-                  return (
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-baseline font-mono">
-                        <span className="text-[10px] text-slate-400 uppercase">Composite Confidence Score</span>
-                        <div className="flex items-baseline gap-2">
-                          <span className={`text-2xl font-extrabold ${scoreColor}`}>
-                            {scoreVal}%
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400">
-                            ({invConfidence.label || invConfidence.confidence_level})
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-[#060B15] h-2.5 rounded-full overflow-hidden border border-[#1E293B]">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 ${scoreBg} ${scoreGlow}`} 
-                          style={{ width: `${Math.min(100, Math.max(0, scoreVal))}%` }} 
-                        />
+                return (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-baseline font-mono">
+                      <span className="text-[10px] text-slate-400 uppercase">Composite Confidence Score</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-2xl font-extrabold ${scoreColor}`}>
+                          {scoreVal}%
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          ({invConfidence.label || invConfidence.confidence_level})
+                        </span>
                       </div>
                     </div>
-                  );
-                })()}
-
-                {/* 4 Supporting Factor Metric Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[10px]">
-                  {/* 1. Evidence Completeness */}
-                  <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
-                    <div>
-                      <div className="text-slate-400 flex justify-between text-[9px]">
-                        <span>EVIDENCE</span>
-                        <span className="text-slate-500">35%</span>
-                      </div>
-                      <span className="text-sm font-bold text-indigo-400 block mt-0.5">
-                        {invConfidence.evidence_completeness}%
-                      </span>
-                    </div>
-                    <div className="mt-1.5">
-                      <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                        <div className="bg-indigo-400 h-full" style={{ width: `${invConfidence.evidence_completeness}%` }} />
-                      </div>
-                      <span className="text-[8px] text-slate-500 block mt-0.5 truncate">5 Core Types</span>
+                    <div className="w-full bg-[#060B15] h-2.5 rounded-full overflow-hidden border border-[#1E293B]">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${scoreBg} ${scoreGlow}`} 
+                        style={{ width: `${Math.min(100, Math.max(0, scoreVal))}%` }} 
+                      />
                     </div>
                   </div>
+                );
+              })()}
 
-                  {/* 2. Agent Agreement */}
-                  <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
-                    <div>
-                      <div className="text-slate-400 flex justify-between text-[9px]">
-                        <span>AGREEMENT</span>
-                        <span className="text-slate-500">40%</span>
-                      </div>
-                      <span className="text-sm font-bold text-emerald-400 block mt-0.5">
-                        {invConfidence.agent_agreement}%
-                      </span>
+              {/* 4 Supporting Factor Metric Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[10px]">
+                {/* 1. Evidence Completeness */}
+                <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
+                  <div>
+                    <div className="text-slate-400 flex justify-between text-[9px]">
+                      <span>EVIDENCE</span>
+                      <span className="text-slate-500">35%</span>
                     </div>
-                    <div className="mt-1.5">
-                      <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                        <div className="bg-emerald-400 h-full" style={{ width: `${invConfidence.agent_agreement}%` }} />
-                      </div>
-                      <span className="text-[8px] text-slate-500 block mt-0.5 truncate">Agent Consensus</span>
-                    </div>
+                    <span className="text-sm font-bold text-indigo-400 block mt-0.5">
+                      {invConfidence.evidence_completeness}%
+                    </span>
                   </div>
-
-                  {/* 3. Source Diversity */}
-                  <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
-                    <div>
-                      <div className="text-slate-400 flex justify-between text-[9px]">
-                        <span>DIVERSITY</span>
-                        <span className="text-slate-500">25%</span>
-                      </div>
-                      <span className="text-sm font-bold text-sky-400 block mt-0.5">
-                        {invConfidence.source_diversity}%
-                      </span>
+                  <div className="mt-1.5">
+                    <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                      <div className="bg-indigo-400 h-full" style={{ width: `${invConfidence.evidence_completeness}%` }} />
                     </div>
-                    <div className="mt-1.5">
-                      <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                        <div className="bg-sky-400 h-full" style={{ width: `${invConfidence.source_diversity}%` }} />
-                      </div>
-                      <span className="text-[8px] text-slate-500 block mt-0.5 truncate">Distinct Sources</span>
-                    </div>
+                    <span className="text-[8px] text-slate-500 block mt-0.5 truncate">5 Core Types</span>
                   </div>
+                </div>
 
-                  {/* 4. Contradictions */}
-                  <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
-                    <div>
-                      <div className="text-slate-400 flex justify-between text-[9px]">
-                        <span>CONFLICTS</span>
-                        <span className="text-slate-500">-1%</span>
-                      </div>
-                      <span className={`text-sm font-bold block mt-0.5 ${
-                        invConfidence.contradiction_count > 0 ? 'text-amber-400' : 'text-emerald-400'
-                      }`}>
-                        {invConfidence.contradiction_count}
-                      </span>
+                {/* 2. Agent Agreement */}
+                <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
+                  <div>
+                    <div className="text-slate-400 flex justify-between text-[9px]">
+                      <span>AGREEMENT</span>
+                      <span className="text-slate-500">40%</span>
                     </div>
-                    <div className="mt-1.5">
-                      <span className={`text-[8px] px-1 py-0.5 rounded font-bold block text-center truncate ${
-                        invConfidence.contradiction_count > 0 
-                          ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                          : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                      }`}>
-                        {invConfidence.contradiction_count > 0 ? `-${invConfidence.contradiction_count}% Penalty` : '0 Conflicts'}
-                      </span>
+                    <span className="text-sm font-bold text-emerald-400 block mt-0.5">
+                      {invConfidence.agent_agreement}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5">
+                    <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                      <div className="bg-emerald-400 h-full" style={{ width: `${invConfidence.agent_agreement}%` }} />
                     </div>
+                    <span className="text-[8px] text-slate-500 block mt-0.5 truncate">Agent Consensus</span>
+                  </div>
+                </div>
+
+                {/* 3. Source Diversity */}
+                <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
+                  <div>
+                    <div className="text-slate-400 flex justify-between text-[9px]">
+                      <span>DIVERSITY</span>
+                      <span className="text-slate-500">25%</span>
+                    </div>
+                    <span className="text-sm font-bold text-sky-400 block mt-0.5">
+                      {invConfidence.source_diversity}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5">
+                    <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                      <div className="bg-sky-400 h-full" style={{ width: `${invConfidence.source_diversity}%` }} />
+                    </div>
+                    <span className="text-[8px] text-slate-500 block mt-0.5 truncate">Distinct Sources</span>
+                  </div>
+                </div>
+
+                {/* 4. Contradictions */}
+                <div className="p-2 bg-[#060B15] rounded-lg border border-[#1E293B] flex flex-col justify-between">
+                  <div>
+                    <div className="text-slate-400 flex justify-between text-[9px]">
+                      <span>CONFLICTS</span>
+                      <span className="text-slate-500">-1%</span>
+                    </div>
+                    <span className={`text-sm font-bold block mt-0.5 ${
+                      invConfidence.contradiction_count > 0 ? 'text-amber-400' : 'text-emerald-400'
+                    }`}>
+                      {invConfidence.contradiction_count}
+                    </span>
+                  </div>
+                  <div className="mt-1.5">
+                    <span className={`text-[8px] px-1 py-0.5 rounded font-bold block text-center truncate ${
+                      invConfidence.contradiction_count > 0 
+                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                        : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                    }`}>
+                      {invConfidence.contradiction_count > 0 ? `-${invConfidence.contradiction_count}% Penalty` : '0 Conflicts'}
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Micro Meta Footer */}
-            <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between text-[9px] font-mono text-slate-500">
-              <span>EVALUATED: {invConfidence?.cases_evaluated ?? 0} COMPLETED RUNS</span>
-              <span>FORMULA: 0.35·EV + 0.40·AG + 0.25·DIV - 1.0·CT</span>
             </div>
-          </div>
+          )}
 
+          {/* Micro Meta Footer */}
+          <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between text-[9px] font-mono text-slate-500">
+            <span>EVALUATED: {invConfidence?.cases_evaluated ?? 0} COMPLETED RUNS</span>
+            <span>FORMULA: 0.35·EV + 0.40·AG + 0.25·DIV - 1.0·CT</span>
+          </div>
         </div>
       </section>
 

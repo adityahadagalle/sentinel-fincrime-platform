@@ -5,7 +5,7 @@ import { graphStyles, isCriticalNode, getNodeClassification, NODE_CONFIG } from 
 import { getRole } from '../../roleStore';
 import { maskAccount } from '../../utils/maskAccount';
 import {
-  ZoomIn, ZoomOut, Maximize2, RotateCcw, Compass, Play,
+  ZoomIn, ZoomOut, Maximize2, RotateCcw, Play,
   ShieldAlert, Lock, ArrowRight, UserCheck, Activity, ChevronRight, Network
 } from 'lucide-react';
 
@@ -60,73 +60,7 @@ const deriveDynamicTopologyLabel = (nodes = [], edges = []) => {
   return `${label} (${nodeCount} Nodes · ${edgeCount} Flows)`;
 };
 
-/**
- * CanvasMinimap — Interactive floating picture-in-picture graph preview matching reference HUD.
- */
-const CanvasMinimap = ({ nodes = [], edges = [] }) => {
-  const nodeCount = nodes.length;
-  if (nodeCount === 0) return null;
 
-  return (
-    <div className="absolute bottom-4 right-4 z-20 bg-[#060B14]/95 border border-[#1E2D4A] rounded-lg p-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.7)] backdrop-blur-md select-none pointer-events-none hidden md:block transition-all duration-300">
-      <div className="flex items-center justify-between gap-4 mb-1.5 pb-1 border-b border-[#1A2640]/60">
-        <div className="flex items-center gap-1.5">
-          <Compass className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-[8.5px] font-mono font-bold uppercase tracking-wider text-slate-200">Canvas Minimap</span>
-        </div>
-        <span className="text-[8.5px] font-mono text-slate-400 font-semibold">{nodeCount} Nodes</span>
-      </div>
-
-      <svg className="w-32 h-16 bg-[#03060A] rounded border border-[#101A2B]" viewBox="0 0 130 65">
-        {edges.map((e, idx) => {
-          const sId = String(e.source || e.from || '');
-          const tId = String(e.target || e.to || '');
-          const srcIdx = nodes.findIndex(n => String(n.id || n.accountId || n.account_id) === sId);
-          const tgtIdx = nodes.findIndex(n => String(n.id || n.accountId || n.account_id) === tId);
-          if (srcIdx === -1 || tgtIdx === -1) return null;
-          const x1 = 15 + (srcIdx / (nodes.length - 1 || 1)) * 100;
-          const y1 = 32 + ((srcIdx % 2 === 0 ? -1 : 1) * (srcIdx % 3)) * 9;
-          const x2 = 15 + (tgtIdx / (nodes.length - 1 || 1)) * 100;
-          const y2 = 32 + ((tgtIdx % 2 === 0 ? -1 : 1) * (tgtIdx % 3)) * 9;
-          const isSusp = e.is_suspicious || e.suspicious;
-          return (
-            <line
-              key={`mm-e-${idx}`}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke={isSusp ? '#EF4444' : '#2563EB'}
-              strokeWidth={isSusp ? 1.5 : 1}
-              strokeOpacity={0.8}
-            />
-          );
-        })}
-
-        {nodes.map((n, idx) => {
-          const x = 15 + (idx / (nodes.length - 1 || 1)) * 100;
-          const y = 32 + ((idx % 2 === 0 ? -1 : 1) * (idx % 3)) * 9;
-          const type = String(n.type || n.account_type || n.node_type || 'mule').toLowerCase();
-          const color = type.includes('victim') || type.includes('source') ? '#2563EB'
-            : type.includes('collector') || type.includes('hub') ? '#F97316'
-            : type.includes('desk') || type.includes('crypto') || type.includes('police') ? '#06B6D4'
-            : type.includes('merchant') ? '#10B981'
-            : type.includes('upi') ? '#9333EA'
-            : '#EF4444';
-          return (
-            <circle
-              key={`mm-n-${n.id || idx}`}
-              cx={x}
-              cy={y}
-              r={type.includes('collector') ? 4.5 : type.includes('mule') ? 3.5 : 3.0}
-              fill={color}
-            />
-          );
-        })}
-      </svg>
-    </div>
-  );
-};
 
 /**
  * EntityLegend — Lower-left legend matching reference screenshot.
@@ -169,6 +103,24 @@ const EntityLegend = () => (
 );
 
 /**
+ * Extract clean node telemetry using existing SENTINEL node properties
+ */
+const extractNodeTelemetry = (node) => {
+  if (!node) return null;
+  const d = typeof node.data === 'function' ? node.data() : node;
+  const rawId = typeof node.id === 'function' ? node.id() : (d.id || d.accountId || '');
+  return {
+    id: rawId,
+    accountId: rawId,
+    type: d.type || d.node_type || d.account_type || 'mule',
+    status: d.status || 'active',
+    risk_score: d.risk_score !== undefined ? d.risk_score : (d.risk !== undefined ? d.risk : 20),
+    layer: d.layer !== undefined ? d.layer : 0,
+    ...d
+  };
+};
+
+/**
  * SelectedEntityHUDCard — Compact card showing active/hovered entity telemetry.
  */
 const SelectedEntityHUDCard = ({ nodeData }) => {
@@ -176,12 +128,16 @@ const SelectedEntityHUDCard = ({ nodeData }) => {
 
   const id = nodeData.id || nodeData.accountId || 'ACC-COLLECTOR-HUB-3648';
   const type = (nodeData.type || nodeData.account_type || nodeData.node_type || 'MULE').toUpperCase();
-  const risk = nodeData.risk_score !== undefined ? nodeData.risk_score : 85;
+  const rawRisk = nodeData.risk_score !== undefined ? nodeData.risk_score : nodeData.risk;
+  const risk = rawRisk !== undefined ? Math.round(Number(rawRisk)) : 85;
   const status = String(nodeData.status || 'ACTIVE').toUpperCase();
 
   const badgeColor = type === 'COLLECTOR' || type === 'HUB' ? 'bg-orange-950/80 text-orange-400 border-orange-500/50'
     : type === 'DESK' || type === 'POLICE' || type === 'CRYPTO' ? 'bg-cyan-950/80 text-cyan-400 border-cyan-500/50'
     : type === 'MULE' ? 'bg-red-950/80 text-red-400 border-red-500/50'
+    : type === 'MERCHANT' ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/50'
+    : type === 'CASHOUT' ? 'bg-amber-950/80 text-amber-400 border-amber-500/50'
+    : type === 'UPI' ? 'bg-purple-950/80 text-purple-400 border-purple-500/50'
     : 'bg-blue-950/80 text-blue-400 border-blue-500/50';
 
   return (
@@ -219,6 +175,9 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], isSimplified = true, o
   const animFrameRef = useRef(null);
 
   const [hoveredNodeData, setHoveredNodeData] = useState(null);
+  const [selectedNodeData, setSelectedNodeData] = useState(null);
+  const hoveredNodeIdRef = useRef(null);
+  const selectedNodeIdRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
 
   useEffect(() => { onNodeClickRef.current = onNodeClick; }, [onNodeClick]);
@@ -230,16 +189,17 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], isSimplified = true, o
     return deriveDynamicTopologyLabel(nodes, edges);
   }, [nodes, edges]);
 
-  // Lead node data for HUD
+  // HUD Node data binding: Hovered node takes precedence, then selected node, then default suspect/first node
   const leadNodeData = useMemo(() => {
     if (hoveredNodeData) return hoveredNodeData;
+    if (selectedNodeData) return selectedNodeData;
     if (nodes.length === 0) return null;
     const suspect = nodes.find(n => {
       const t = String(n.type || n.account_type || n.node_type || '').toLowerCase();
       return t.includes('mule') || t.includes('collector') || t.includes('flagged');
     });
     return suspect || nodes[1] || nodes[0] || null;
-  }, [hoveredNodeData, nodes]);
+  }, [hoveredNodeData, selectedNodeData, nodes]);
 
   // ── Continuous Motion Loop: Dash-Flow + Critical Node Breathing Glow ─────
   useEffect(() => {
@@ -404,16 +364,11 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], isSimplified = true, o
       cy.elements().difference(neighborhood).addClass('dimmed');
       neighborhood.addClass('highlighted');
 
-      const nodeData = {
-        id: node.id(),
-        accountId: node.id(),
-        status: node.data('status'),
-        type: node.data('type'),
-        risk_score: node.data('risk_score'),
-        layer: node.data('layer'),
-        ...node.data()
-      };
-      setHoveredNodeData(nodeData);
+      const nodeData = extractNodeTelemetry(node);
+      selectedNodeIdRef.current = node.id();
+      setSelectedNodeData(nodeData);
+      hoveredNodeIdRef.current = null;
+      setHoveredNodeData(null);
       onSelectionChangeRef.current?.({ type: 'node', id: node.id(), hops: neighborhood.edges().length || 1 });
       onNodeClickRef.current?.(nodeData);
     });
@@ -422,23 +377,32 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], isSimplified = true, o
     cy.on('mouseover', 'node', (evt) => {
       if (isTracingRef.current) return;
       const node = evt.target;
+      hoveredNodeIdRef.current = node.id();
       const neighborhood = node.neighborhood().add(node);
       cy.elements().addClass('dimmed');
       neighborhood.removeClass('dimmed').addClass('hovered-focus');
 
-      setHoveredNodeData({
-        id: node.id(),
-        accountId: node.id(),
-        type: node.data('type'),
-        status: node.data('status'),
-        risk_score: node.data('risk_score'),
-        layer: node.data('layer')
-      });
+      setHoveredNodeData(extractNodeTelemetry(node));
     });
 
-    cy.on('mouseout', 'node', () => {
+    cy.on('mouseout', 'node', (evt) => {
       if (isTracingRef.current) return;
+      const node = evt.target;
+      if (hoveredNodeIdRef.current === node.id()) {
+        hoveredNodeIdRef.current = null;
+        setHoveredNodeData(null);
+      }
       cy.elements().removeClass('dimmed hovered-focus');
+
+      // If a node was previously selected, restore its focus highlighting
+      if (selectedNodeIdRef.current) {
+        const selEle = cy.getElementById(selectedNodeIdRef.current);
+        if (selEle.length > 0) {
+          const selNeighborhood = selEle.neighborhood().add(selEle);
+          cy.elements().difference(selNeighborhood).addClass('dimmed');
+          selNeighborhood.addClass('highlighted');
+        }
+      }
     });
 
     // Edge click -> Select transaction
@@ -456,11 +420,24 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], isSimplified = true, o
     cy.on('tap', (evt) => {
       if (evt.target === cy) {
         cy.elements().removeClass('highlighted path-highlight dimmed traced-edge hovered-focus');
+        selectedNodeIdRef.current = null;
+        setSelectedNodeData(null);
+        hoveredNodeIdRef.current = null;
         setHoveredNodeData(null);
         onSelectionChangeRef.current?.(null);
         onNodeClickRef.current?.(null);
         onEdgeClickRef.current?.(null);
         setTooltip(null);
+      }
+    });
+
+    // Background mouseover -> Clear temporary hover state if moving over empty canvas
+    cy.on('mouseover', (evt) => {
+      if (evt.target === cy) {
+        if (hoveredNodeIdRef.current) {
+          hoveredNodeIdRef.current = null;
+          setHoveredNodeData(null);
+        }
       }
     });
 
@@ -618,8 +595,7 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], isSimplified = true, o
       {/* Lower-Left Selected Entity HUD Card (Matching Reference) */}
       <SelectedEntityHUDCard nodeData={leadNodeData} />
 
-      {/* Interactive Minimap (Bottom-Right - Matching Reference) */}
-      <CanvasMinimap nodes={nodes} edges={edges} />
+
     </div>
   );
 });

@@ -204,6 +204,34 @@ def _recalculate_node_stats(graph: dict):
         elif not node.get("node_type"):
             node["node_type"] = "individual"
 
+        # Calculate or inherit node risk scores from connected transactions and archetype
+        curr_risk = float(node.get("risk_score", 0.0))
+        if curr_risk <= 0.0:
+            connected_risks = [
+                float(e.get("risk_score", 0.0))
+                for e in graph.get("edges", [])
+                if (e.get("from") == nid or e.get("to") == nid or e.get("source") == nid or e.get("target") == nid)
+                and float(e.get("risk_score", 0.0)) > 0.0
+            ]
+            max_edge_risk = max(connected_risks) if connected_risks else 0.0
+            ntype = str(node.get("node_type", "")).lower()
+            nstatus = str(node.get("status", "")).upper()
+
+            if ntype == "victim" or layer_val == 0:
+                node["risk_score"] = 15.0
+            elif nstatus in ("FLAGGED", "FROZEN"):
+                node["risk_score"] = max(max_edge_risk, 85.0) if max_edge_risk > 0 else 88.0
+            elif ntype == "mule":
+                node["risk_score"] = max_edge_risk if max_edge_risk > 0 else 85.0
+            elif ntype in ("cashout", "crypto"):
+                node["risk_score"] = max(max_edge_risk, 88.0) if max_edge_risk > 0 else 92.0
+            elif ntype == "merchant":
+                node["risk_score"] = max_edge_risk if max_edge_risk > 0 else 65.0
+            elif ntype == "collector":
+                node["risk_score"] = max_edge_risk if max_edge_risk > 0 else 80.0
+            else:
+                node["risk_score"] = max_edge_risk if max_edge_risk > 0 else 20.0
+
     graph["max_hops"] = max(max_layer, 1)
 
 
@@ -498,10 +526,13 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
                 "channel": tx.get("channel", "UPI"),
                 "parent_transaction_id": tx.get("parent_transaction_id"),
                 "root_transaction_id": tx.get("root_transaction_id") or tid,
-                "timestamp": tx.get("timestamp", "")
+                "timestamp": tx.get("timestamp", ""),
+                "risk_score": float(tx.get("risk_score", 0.0))
             }
 
     final_edges = list(edges_by_tx.values())
+    if len(final_edges) > depth_limit:
+        final_edges = final_edges[:depth_limit]
     active_node_ids = set()
     for e in final_edges:
         active_node_ids.add(e.get("from"))
