@@ -1,17 +1,20 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
-import { Activity, LayoutDashboard, Briefcase, Shield, LogOut, ShieldAlert } from 'lucide-react';
+import { Activity, LayoutDashboard, Briefcase, Shield, LogOut, ShieldAlert, FlaskConical } from 'lucide-react';
 
 // Pages
 import Feed from './pages/Feed';
 import Dashboard from './pages/Dashboard';
 import Cases from './pages/Cases';
 import Graph from './pages/Graph';
+import BenchmarkLab from './pages/BenchmarkLab';
 
 import SystemStatusBar from './components/SystemStatusBar';
 import AttackModeToggle from './components/AttackModeToggle';
 import AutomateModeToggle from './components/AutomateModeToggle';
+import PresentationModeToggle from './components/PresentationModeToggle';
+import PresentationModeIndicator from './components/PresentationModeIndicator';
 import LiveAlertToast from './components/LiveAlertToast';
 
 import ActionTakenToast from './components/ActionTakenToast';
@@ -58,6 +61,7 @@ const App = () => {
   return (
     <Router>
       <div className="flex h-screen w-screen bg-background text-foreground relative font-sans antialiased overflow-hidden">
+        <PresentationModeIndicator />
         <LiveAlertToast />
         <ActionTakenToast />
 
@@ -117,6 +121,7 @@ const App = () => {
 
               )}
               <AttackModeToggle />
+              <PresentationModeToggle />
             </div>
 
 
@@ -137,6 +142,10 @@ const App = () => {
               <NavLink to="/cases" className={navItemClass}>
                 <Briefcase className="w-4 h-4 shrink-0" />
                 <span>Cases</span>
+              </NavLink>
+              <NavLink to="/benchmark" className={navItemClass}>
+                <FlaskConical className="w-4 h-4 shrink-0" />
+                <span>Benchmark Lab</span>
               </NavLink>
             </nav>
           </div>
@@ -170,6 +179,7 @@ const App = () => {
               <Route path="/feed" element={<Feed />} />
               <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
               <Route path="/cases" element={<Cases />} />
+              <Route path="/benchmark" element={<ErrorBoundary><BenchmarkLab /></ErrorBoundary>} />
               <Route path="/graph/:caseId" element={<ErrorBoundary><Graph /></ErrorBoundary>} />
             </Routes>
           </div>

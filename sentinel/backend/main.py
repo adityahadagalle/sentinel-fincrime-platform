@@ -91,6 +91,10 @@ app.add_middleware(
 from app.routes.intelligence import router as intelligence_router
 app.include_router(intelligence_router)
 
+# ── BENCHMARK LAB ROUTER ──────────────────────────────────────────────────────
+from app.routes.benchmark import router as benchmark_router
+app.include_router(benchmark_router)
+
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: list[WebSocket] = []
@@ -115,6 +119,9 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 investigation_orchestrator.broadcast_manager = manager
+from app.services.benchmark_service import benchmark_service
+benchmark_service.broadcast_manager = manager
+
 
 
 
@@ -683,7 +690,7 @@ async def _build_investigation_read_model(case_id: str, repo: AbstractCaseReposi
                 rpt = rpt_obj.get("report_data")
 
         # Deterministic fallback for EVIDENCE collection stage if report is missing
-        if stg == "EVIDENCE" and (not rpt or stg_status != "COMPLETED"):
+        if run and stg == "EVIDENCE" and (not rpt or stg_status != "COMPLETED"):
             try:
                 ev_fallback = collect_evidence_for_case(case_id, data_store)
                 if ev_fallback and ev_fallback.get("evidence"):

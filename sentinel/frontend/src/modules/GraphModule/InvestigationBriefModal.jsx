@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 
 import AnalystEvidenceViewer from '../../components/AnalystEvidenceViewer';
+import { twMerge } from 'tailwind-merge';
 
 const AI_STATUS = { IDLE: 'idle', LOADING: 'loading', READY: 'ready', UNAVAILABLE: 'unavailable', TIMEOUT: 'timeout', ERROR: 'error', NO_DATA: 'no_data' };
 
