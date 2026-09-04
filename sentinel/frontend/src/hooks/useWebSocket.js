@@ -335,6 +335,11 @@ const handleEvent = (payload = {}) => {
     return;
   }
 
+  if (type === 'benchmark.progress' || type === 'benchmark.completed') {
+    window.dispatchEvent(new CustomEvent('sentinel_' + type.replace('.', '_'), { detail: payload }));
+    return;
+  }
+
   if (type === EVENT_TYPES.ACTION_TAKEN) {
     const incoming = normalizeAction(payload);
     setStore((prev) => ({
