@@ -1,308 +1,462 @@
 # SENTINEL — Real-Time Financial Crime Detection & Autonomous Investigation Platform
 
-**SENTINEL** is an enterprise-grade, real-time financial crime detection, dynamic case management, and autonomous investigation platform. Built for financial intelligence units (FIUs) and compliance teams, SENTINEL ingests high-velocity transaction streams, executes deterministic hybrid risk scoring, constructs interactive multi-hop financial network graphs, orchestrates a 5-stage automated investigation pipeline, and enforces strict governance boundaries between automated execution and human analyst authorization.
+**SENTINEL** is an enterprise-grade, real-time financial crime detection, dynamic case management, multi-agent investigation, and compliance benchmarking platform. Built for Financial Intelligence Units (FIUs), AML compliance teams, and fraud analysts, SENTINEL ingests high-velocity transaction streams, executes deterministic hybrid risk scoring (60% ML + 40% Rules), constructs interactive multi-hop financial network graphs, orchestrates an asynchronous 5-stage automated investigation pipeline, and enforces strict, non-negotiable governance boundaries between automated execution and human operator authorization.
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Project Overview](#-project-overview)
-2. [Problem Statement](#-problem-statement)
-3. [Innovation & Core Concepts](#-innovation--core-concepts)
-4. [Key Capabilities](#-key-capabilities)
-5. [System Architecture](#-system-architecture)
-6. [End-to-End Transaction Flow](#-end-to-end-transaction-flow)
-7. [Real-Time Monitoring & Telemetry](#-real-time-monitoring--telemetry)
-8. [Risk Scoring Engine](#-risk-scoring-engine)
-9. [5-Stage Automated Investigation Pipeline](#-5-stage-automated-investigation-pipeline)
-10. [Autonomous Policy & Action Engine](#-autonomous-policy--action-engine)
-11. [Human Approval Boundary & Governance](#-human-approval-boundary--governance)
-12. [Dynamic Case Management & Lifecycle](#-dynamic-case-management--lifecycle)
-13. [Multi-Hop Graph & Network Intelligence](#-multi-hop-graph--network-intelligence)
-14. [Audit Trail & Compliance Export](#-audit-trail--compliance-export)
-15. [Qwen / Ollama Advisory Intelligence](#-qwen--ollama-advisory-intelligence)
-16. [Technology Stack](#-technology-stack)
-17. [Repository Structure](#-repository-structure)
-18. [Dependencies & Requirements](#-dependencies--requirements)
-19. [Environment Configuration](#-environment-configuration)
+2. [Current System Status & Operating Reality](#-current-system-status--operating-reality)
+3. [System Architecture](#-system-architecture)
+4. [End-to-End Transaction Flow](#-end-to-end-transaction-flow)
+5. [Risk Scoring Engine & Hybrid Fusion](#-risk-scoring-engine--hybrid-fusion)
+6. [Autonomous Policy Engine & Human Approval Boundary](#-autonomous-policy-engine--human-approval-boundary)
+7. [5-Stage Multi-Agent Investigation Pipeline](#-5-stage-multi-agent-investigation-pipeline)
+8. [Investigation Confidence Index](#-investigation-confidence-index)
+9. [Advisory LLM Intelligence (Qwen / Ollama)](#-advisory-llm-intelligence-qwen--ollama)
+10. [Multi-Hop Graph & Network Intelligence](#-multi-hop-graph--network-intelligence)
+11. [Asset Recovery Engine](#-asset-recovery-engine)
+12. [Benchmark Lab & Synthetic Testing Bench](#-benchmark-lab--synthetic-testing-bench)
+13. [Analytics & Telemetry Dashboard](#-analytics--telemetry-dashboard)
+14. [Real-Time WebSocket Architecture & Presentation Mode](#-real-time-websocket-architecture--presentation-mode)
+15. [Frontend Application & Navigation](#-frontend-application--navigation)
+16. [Authentication & Role Simulation](#-authentication--role-simulation)
+17. [Database Architecture & Persistence Models](#-database-architecture--persistence-models)
+18. [Technology Stack](#-technology-stack)
+19. [Repository Structure](#-repository-structure)
 20. [Local Installation & Setup](#-local-installation--setup)
-21. [Local Run Instructions](#-local-run-instructions)
+21. [Running the Application](#-running-the-application)
 22. [API Reference](#-api-reference)
 23. [WebSocket Event Reference](#-websocket-event-reference)
 24. [Testing & Quality Assurance](#-testing--quality-assurance)
-25. [Development Notes](#-development-notes)
-26. [Security & Governance Boundaries](#-security--governance-boundaries)
-27. [Current Limitations](#-current-limitations)
-28. [Future Extension Areas](#-future-extension-areas)
+25. [Current Limitations & Extension Areas](#-current-limitations--extension-areas)
 
 ---
 
 ## 🎯 Project Overview
 
-SENTINEL bridges the critical gap between real-time transaction monitoring and complex forensic investigations. By combining deterministic rule scoring, a rule-guided ML emulator, multi-hop graph topology analysis, an automated 5-agent investigation pipeline, and an advisory LLM interface (Qwen 3), SENTINEL enables security analysts to detect mule chains, circular flows, and funnel accounts in milliseconds, while enforcing regulatory compliance and complete auditability.
+SENTINEL bridges the critical divide between high-speed automated fraud detection and deep forensic investigations. Modern financial crime operates across multi-hop layered mule networks at sub-second velocity. Traditional anti-money laundering (AML) platforms either overload analysts with disconnected alerts or risk regulatory disaster through uncontrolled automated account lockouts.
+
+SENTINEL solves this through three core principles:
+1. **Deterministic Hybrid Risk Scoring**: Predictable, reproducible risk calculation fusing rule-based heuristics with a correlated rule-guided ML emulator ($0.60 \times \text{ML} + 0.40 \times \text{Rule}$).
+2. **Strict Human-in-the-Loop Governance Boundary**: Routine containment actions (monitoring, analyst queue escalation) execute autonomously when Automate Mode is active, but **Account Freezes NEVER execute autonomously**. They strictly require authorized human operator sign-off (`REQUIRES_OPERATOR_ACTION`).
+3. **Decoupled Advisory AI**: Advisory Large Language Models (Qwen 3 via local Ollama) synthesize human-readable investigative narratives from verified agent findings, but have **zero** authority to alter risk scores, mutate database state, or trigger enforcement actions.
 
 ---
 
-## ⚠️ Problem Statement
+## 🚦 Current System Status & Operating Reality
 
-Modern financial crime (money laundering, mule networks, rapid velocity attacks, authorized push payment fraud) operates at sub-second speeds across multi-layered account networks. Traditional anti-money laundering (AML) platforms suffer from:
+To ensure total transparency for technical evaluators, judges, and developers joining the codebase, the following outlines the **actual working implementation** today:
 
-- **Slow Manual Triage**: High alert volumes overload compliance analysts.
-- **Siloed Investigations**: Transactions evaluated in isolation miss multi-hop mule chains.
-- **Uncontrolled Automation**: Blind automated freezes risk false-positive account lockouts and regulatory non-compliance.
-- **Black-Box AI**: Unexplainable LLM recommendations violate regulatory transparency mandates.
-
-SENTINEL solves this by decoupling **Deterministic Policy Enforcement** from **Advisory AI Intelligence**, ensuring all financial enforcement is strictly governed while empowering analysts with automated forensic synthesis.
-
----
-
-## 💡 Innovation & Core Concepts
-
-1. **Human-in-the-Loop Governance Boundary**: Hard enforcement rules (such as Account Freezes) require explicit human operator authorization (`REQUIRES_OPERATOR_ACTION`), while routine actions (monitoring, escalation, STR filings) can execute autonomously when Automate Mode is enabled.
-2. **Deterministic 5-Stage Investigation Pipeline**: An asynchronous multi-agent orchestrator runs Evidence Collection, Contextual Analysis, Regulatory Assessment, Audit Explanation, and Analyst Decision Support, persisting immutable stage reports.
-3. **Investigation Confidence Index**: A deterministic metric (0.0 to 100.0) combining evidence completeness (35%), agent agreement (40%), and source diversity (25%) minus contradiction penalties, measuring evidence strength rather than raw fraud probability.
-4. **Advisory LLM Integration**: Qwen 3 (via local Ollama) acts purely as an advisory analyst assistant. It receives pre-sanitized context from the 5 investigation stages and can **never** trigger account freezes or alter database states.
-5. **Dual Storage Flexibility**: Operates in zero-setup **In-Memory Store** mode for rapid local development, or switches seamlessly to **PostgreSQL + Alembic** for production durability.
-
----
-
-## 🚀 Key Capabilities
-
-- **Real-Time Transaction Ingestion**: Sub-millisecond evaluation of incoming UPI, IMPS, NEFT, CARD, and SWIFT transactions.
-- **Hybrid Risk Scoring**: Evaluates amount deviations, time anomalies (10 PM – 6 AM), new receiver flags, active call indicators, cross-border status, velocity spikes, and crypto involvement.
-- **Multi-Hop Topology Detection**: Identifies 6 distinct network patterns: Normal Payment, 3-Hop Layering, 5-Hop Mule Chains, Funnel Accounts, Fan-Out Dispersion, and Circular Flows.
-- **Interactive Cytoscape Graph Workstation**: Visualizes fraud money flows, lead node suspect identification, node freezing, and real-time recoverable asset calculation.
-- **Attack Mode Simulator**: Generates connected 5-hop, 6-node suspicious cascades for live demonstration and stress testing.
-- **Compliance-Grade Audit Export**: Generates 16-field UTF-8 BOM CSV audit logs with formula injection protection (`='`, `@'`).
+| Subsystem | Actual Current Implementation Status | Operating Nature |
+| :--- | :--- | :--- |
+| **Risk Scoring** | **Active & Live** | 4-factor rule engine + dynamic boost factors + proportional amount scaler. |
+| **ML Engine** | **Rule-Guided ML Emulator** | Correlated statistical emulator tracking rule score ($r > 0.95$). Supports deterministic seed for 100% reproducible testing. **Not a trained binary model file**. |
+| **Hybrid Score** | **Active & Live** | Deterministic fusion: $\text{floor}(0.60 \times \text{ML} + 0.40 \times \text{Rule})$. Clamped in $[0, 100]$. |
+| **Policy Engine** | **Active & Live** | Deterministic policy evaluation with fail-closed safety rules and `Automate Mode` toggle. |
+| **Human Freeze Boundary** | **Active & Live** | Hard governance boundary: `FREEZE` actions return `REQUIRES_OPERATOR_ACTION`. Zero autonomous freezes. |
+| **Investigation Pipeline** | **Active & Live** | 5 asynchronous Python stages (Evidence, Contextual, Regulatory, Audit, Decision Support). |
+| **Investigation Confidence** | **Active & Live** | Deterministic formula: $0.35 \times \text{Completeness} + 0.40 \times \text{Agreement} + 0.25 \times \text{Diversity} - \text{Contradictions}$. |
+| **Qwen / Ollama** | **Active (Advisory Only)** | Local `qwen3:8b` via Ollama HTTP API. Returns structured JSON summaries. Fails gracefully if offline. |
+| **Graph Module** | **Active & Live** | NetworkX backend + Cytoscape.js frontend. Identifies 6 authentic topologies and lead suspects. |
+| **Asset Recovery** | **Active & Live** | Calculates non-withdrawn account balances capped at total fraud exposure. |
+| **Benchmark Lab** | **Active & Live** | Minimal setup, 7 test scenarios, 7-step guided transaction builder, deterministic repeat test ($\Delta = 0$). |
+| **Analytics Dashboard** | **Active & Live** | 6-tier telemetry story strictly derived from authentic backend state (no fabricated numbers). |
+| **Presentation Mode** | **Active & Live** | Global client-side toggle that suppresses intrusive alert toasts during demonstrations without altering event streams. |
+| **Database** | **Active & Live** | Dual support: In-Memory store (`data_store.py`) for zero-setup dev, PostgreSQL + AsyncSession for production. |
+| **Authentication** | **Simulated / Client-Side** | Persona toggle (`admin` / `operator`) stored in `localStorage`. Client-side only; not backend JWT/OAuth2. |
+| **External Banking APIs** | **Simulated Sandbox** | Bank, telecom, and police integrations simulated via local state changes (`mock_apis.py`). |
 
 ---
 
 ## 🏗️ System Architecture
 
-```
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│                           TRANSACTION STREAM                                      │
-│               (Internal Generator / Simulator / REST API Endpoint)                │
-└────────────────────────────────────────┬──────────────────────────────────────────┘
-                                         │
-                                         ▼
-                             ┌──────────────────────┐
-                             │  POST /transaction   │
-                             │ (FastAPI Ingestion)  │
-                             └───────────┬──────────┘
-                                         │
-                                         ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│                          ORCHESTRATION PIPELINE                                   │
-├───────────────────────────────────────────────────────────────────────────────────┤
-│ 1. Persistence & Account State Initialization                                     │
-│ 2. Hybrid Risk Scoring (Rule Engine + Rule-Guided ML Emulator)                    │
-│ 3. Case Linking & Graph Topology Building                                         │
-│ 4. Deterministic Autonomous Policy Evaluation                                     │
-│ 5. Simulated Action Execution & State Transition                                 │
-│ 6. Asynchronous 5-Stage Investigation Pipeline Execution                          │
-└────────────────────────────────────────┬──────────────────────────────────────────┘
-                                         │
-                   ┌─────────────────────┴─────────────────────┐
-                   ▼                                           ▼
-┌───────────────────────────────────┐       ┌───────────────────────────────────┐
-│     DATA STORAGE ADAPTER LAYER    │       │     WEBSOCKET BROADCAST MANAGER   │
-├───────────────────────────────────┤       ├───────────────────────────────────┤
-│ - In-Memory Store (Development)   │       │ Pushes real-time events:          │
-│ - PostgreSQL Store (Production)   │       │ - tx_scored                       │
-│ - Alembic Schema Migrations       │       │ - case_updated                    │
-└──────────────────┬────────────────┘       │ - transaction.action              │
-                   │                        │ - automation.action.executed      │
-                   │                        └──────────────────┬────────────────┘
-                   │                                           │
-                   └─────────────────────┬─────────────────────┘
-                                         │
-                                         ▼
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│                                REACT FRONTEND                                     │
-├───────────────────────────────────────────────────────────────────────────────────┤
-│ - Feed Page: Real-time transaction stream with risk indicators                    │
-│ - Analytics Dashboard: Telemetry KPIs, Investigation Confidence, Risk Trends     │
-│ - Cases Workbench: Active investigations, Golden Timers, Disposition Modal        │
-│ - Graph Workstation: Interactive Cytoscape network visualization & Node Control   │
-│ - Qwen Intelligence Panel: Advisory AI synthesis and human analyst briefing       │
-└───────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Clients["Presentation & UI Layer (React 18 + Vite)"]
+        UI_Feed["Real-Time Feed (/feed)"]
+        UI_Dash["Analytics Dashboard (/dashboard)"]
+        UI_Cases["Cases Workbench (/cases)"]
+        UI_Graph["Graph Workstation (/graph/:caseId)"]
+        UI_Bench["Benchmark Lab (/benchmark)"]
+        UI_Toast["Live Alerts & Presentation Mode"]
+    end
+
+    subgraph API_Gateway["FastAPI Ingestion & Transport Layer"]
+        REST["REST API Endpoints (main.py, benchmark.py, intelligence.py)"]
+        WS["WebSocket Manager (/ws - Broadcast: tx_scored, case_updated, actions)"]
+    end
+
+    subgraph Core_Engines["Deterministic Risk & Enforcement Core"]
+        ORCH["Transaction Orchestrator (orchestrator.py)"]
+        RULE["Rule Scoring Engine (scoring_engine.py)"]
+        MLEMU["Rule-Guided ML Emulator (ml_risk_engine.py)"]
+        FUSION["Hybrid Score Fusion (60% ML + 40% Rule)"]
+        POLICY["Autonomous Policy Engine (autonomous_policy_engine.py)"]
+        ACTION["Simulated Action Executor (simulated_action_executor.py)"]
+        GOV{"Operator Boundary: FREEZE?"}
+    end
+
+    subgraph Investigation_System["Multi-Agent Investigation Subsystem"]
+        INV_ORCH["Investigation Orchestrator (investigation_orchestrator.py)"]
+        STG1["Stage 1: Evidence Agent"]
+        STG2["Stage 2: Contextual Agent"]
+        STG3["Stage 3: Regulatory Agent"]
+        STG4["Stage 4: Audit Explanation Agent"]
+        STG5["Stage 5: Decision Support Agent"]
+        CONF["Investigation Confidence Engine"]
+        QWEN["Advisory LLM (Qwen 3 via Ollama) - Non-Enforcing"]
+    end
+
+    subgraph Storage_Layer["Persistence & State Layer"]
+        MEM["In-Memory Store (data_store.py)"]
+        PG[("PostgreSQL Database (AsyncSession + Alembic)")]
+        AUDIT["Immutable 21-Field Audit Log"]
+    end
+
+    Clients <-->|REST & WebSockets| API_Gateway
+    API_Gateway --> ORCH
+    ORCH --> RULE & MLEMU
+    RULE & MLEMU --> FUSION
+    FUSION --> POLICY
+    POLICY --> GOV
+    GOV -->|Freeze Requires Approval| REST
+    GOV -->|Autonomous Actions| ACTION
+    ACTION --> Storage_Layer
+    ORCH -->|High Risk / Case Linked| INV_ORCH
+    INV_ORCH --> STG1 --> STG2 --> STG3 --> STG4 --> STG5
+    STG5 --> CONF
+    INV_ORCH -.->|Sanitized Context| QWEN
+    QWEN -.->|Advisory Narrative Only| REST
+    Storage_Layer <--> Core_Engines & Investigation_System
 ```
 
 ---
 
 ## 🔄 End-to-End Transaction Flow
 
-1. **Ingestion**: Transaction received at `POST /transaction`.
-2. **Scoring**: `score_transaction()` calculates rule score; `predict_ml_score()` generates correlated ML emulator score.
-3. **Policy Evaluation**: `evaluate_autonomous_policy()` checks risk thresholds, case state, and `automation_mode`.
-4. **Action Execution**: `execute_simulated_action()` updates account state (`ACTIVE`, `FROZEN`, `BLOCKED`, `MONITORING`, `ACTIONED`) and logs 21-field audit record with idempotency check.
-5. **Investigation Pipeline**: `investigation_orchestrator` runs 5 analytical stages asynchronously for high-risk cases.
-6. **Real-time Sync**: `ConnectionManager` broadcasts events (`tx_scored`, `case_updated`, `transaction.action`) to React clients over WebSockets.
-7. **Analyst Review**: Compliance analysts inspect cases, view Cytoscape graphs, read Qwen advisory reports, and submit stateful dispositions (`POST /cases/{case_id}/disposition`).
+1. **Ingestion**: Transaction is received via `POST /transaction`, simulated by `simulator.py`, or triggered inside the `Benchmark Lab`.
+2. **Validation & State Initialization**: The payload is validated; sender and receiver accounts are initialized in the storage layer.
+3. **Rule-Based Scoring**: `scoring_engine.py` evaluates 4 core rule weights (New Receiver, Amount Deviation, Time Anomaly, Active Call) plus dynamic telemetry boosts.
+4. **Proportional Amount Scaling**: Transactions below ₹5,000 are proportionally scaled down to prevent minor routine payments from generating false positive high-risk alerts.
+5. **Rule-Guided ML Emulator**: `predict_ml_score()` generates a correlated score tracking the rule score with band-proportional noise.
+6. **Hybrid Score Fusion**: Final score is calculated deterministically:
+   $$\text{Final Score} = \text{floor}(0.60 \times \text{ML} + 0.40 \times \text{Rule})$$
+7. **Risk Tier Assignment**:
+   - **`CRITICAL`**: $\ge 85$
+   - **`HIGH`**: $70 - 84$
+   - **`MEDIUM`**: $40 - 69$
+   - **`LOW`**: $< 40$
+8. **Case Linking & Graph Building**: High-risk transactions ($\ge 70$) are linked to an active case or trigger new case creation. `graph_engine.py` maps the transaction edge and topological layer.
+9. **Autonomous Policy Evaluation**: `evaluate_autonomous_policy()` checks risk thresholds, case state, and the `Automate Mode` toggle:
+   - If action is `FREEZE`, policy returns `decision: "EXECUTE"`, `execution_status: "REQUIRES_OPERATOR_ACTION"`.
+   - If `Automate Mode` is OFF, non-freeze actions default to `DO_NOT_EXECUTE` (`POL-MODE-OFF`).
+   - If `Automate Mode` is ON, routine actions (`MONITOR`, `ENHANCED_MONITORING`, `ESCALATE_ANALYST_REVIEW`) execute autonomously.
+10. **Action Execution & Audit Logging**: `execute_simulated_action()` transitions account states (`ACTIVE`, `FROZEN`, `MONITORING`, `ACTIONED`) and records an immutable 21-field audit entry.
+11. **Multi-Agent Investigation**: If linked to a high-risk case, `investigation_orchestrator` asynchronously executes all 5 analytical stages and computes the Investigation Confidence index.
+12. **Real-Time Sync**: `ConnectionManager` broadcasts events (`tx_scored`, `case_updated`, `transaction.action`) to all connected WebSockets.
+13. **Analyst Review**: Compliance analysts view the transaction in the Real-Time Feed or Cases Workbench, inspect Cytoscape graphs, and submit stateful dispositions (`POST /cases/{case_id}/disposition`).
 
 ---
 
-## 📊 Real-Time Monitoring & Telemetry
+## ⚖️ Risk Scoring Engine & Hybrid Fusion
 
-The React frontend maintains a persistent WebSocket connection (`useWebSocket.js`) with automatic fallback to polling (`/cases` every 2s) if disconnected.
+SENTINEL employs a deterministic scoring pipeline combining human-auditable rules with statistical machine learning emulation.
 
-- **System Status Bar**: Displays status (`LIVE`, `POLLING`, `RECONNECTING`, `OFFLINE`).
-- **Live Alert Toasts**: Pops toasts for fresh (< 30s) high-risk transactions (`sentinel_alert`).
-- **Action Toasts**: Notifies operators when actions are executed or require manual authorization (`sentinel_action`).
+### Core Rule Weights (`app/core/config.py`)
 
----
-
-## ⚖️ Risk Scoring Engine
-
-SENTINEL uses a hybrid deterministic scoring model (`app/engines/scoring_engine.py`) combined with a **Rule-Guided ML Emulator** (`app/services/ml_risk_engine.py`).
-
-### Rule-Based Weighting
-
-| Factor | Weight | Trigger Condition |
-| :--- | :--- | :--- |
-| **New Receiver** | 35% | First time transferring to recipient account |
-| **Amount Deviation** | 30% | Transfer amount exceeds historical monthly average |
-| **Time Anomaly** | 20% | Off-hours transaction (10 PM – 6 AM) |
-| **Active Call Flag** | 15% | Device on active phone call during transaction |
+| Feature | Weight | Value | Description |
+| :--- | :--- | :--- | :--- |
+| **New Receiver** | **35%** | 0 or 100 | First transfer from sender to this beneficiary account |
+| **Amount Deviation** | **30%** | 0 – 100 | Ratio of transaction amount to typical monthly baseline ($2\times \text{baseline} = 100$) |
+| **Time Anomaly** | **20%** | 0 or 100 | Off-hours payment initiated late at night (10:00 PM – 6:00 AM) |
+| **Active Call Flag** | **15%** | 0 or 100 | Device indicates customer was on an active phone call during payment (coercion indicator) |
 
 ### Dynamic Boost Telemetry
 
-- **Velocity Spike**: +40 score boost
-- **Cross-Border Transfer**: +50 score boost
-- **Device / Location Change**: +40 score boost
-- **Crypto-Related**: +50 score boost
-- **Remote Access Active**: +50 score boost
-- **Scripted Fraud Behavior**: +40 score boost
+When advanced threat indicators are detected, mandatory score boosts are incorporated:
+- **Velocity Spike**: `velocity_flag` (+40 contribution)
+- **Cross-Border Corridor**: `is_cross_border` (+50 contribution)
+- **Device / Location Anomaly**: `device_changed` / `location_changed` (+40 contribution)
+- **Crypto Transfer**: `is_crypto_related` (+50 contribution)
+- **Remote Access Tool**: `is_remote_access_active` (+50 contribution)
+- **Scripted Automation**: `is_scripted` (+40 contribution)
+- **Rapid Bulk Transfer**: `bulk_transfer_flag` (+30 contribution)
+- **First-Time Payee Added**: `new_payee_added` (+30 contribution)
 
-### Rule-Guided ML Emulator
+### Multi-Hop Decay Formula
+In money movement chains, subsequent intermediary hops inherit and decay the origin risk score:
+$$\text{Hop Score} = \text{int}\left(\text{Origin Score} \times \left(0.85^{\max(0, \text{hop} - 1)}\right)\right)$$
 
-Produces a correlated ML score ($r > 0.95$) tracking the rule score with band-proportional variation:
-- **High Risk ($\ge 80$)**: $\pm 5$ variation
-- **Medium Risk ($\ge 50$)**: $\pm 10$ variation
-- **Low Risk ($< 50$)**: $\pm 15$ variation
+### Proportional Amount Scaler
+For small transactions below ₹5,000 with no critical flags, the risk score is scaled to reduce retail false positives:
+$$\text{Scaling Factor} = 0.30 + \left(0.70 \times \frac{\text{Amount}}{5000}\right)$$
+If critical coercion flags are present, an absolute floor of 25 is maintained.
 
-*Note: The ML engine runs in Emulator mode by default to guarantee stability without binary dependency issues.*
+### Rule-Guided ML Emulator (`app/services/ml_risk_engine.py`)
 
----
-
-## 🔍 5-Stage Automated Investigation Pipeline
-
-When a high-risk case is created, `investigation_orchestrator.py` asynchronously executes 5 dependency-ordered stages:
-
-1. **EVIDENCE (`evidence_agent.py`)**: Collects empirical evidence across transaction metadata, historical baselines, counterparty flows, network graphs, and recovery amounts.
-2. **CONTEXTUAL (`contextual_agent.py`)**: Evaluates behavioral patterns (mule cascades, velocity spikes, rapid off-boarding).
-3. **REGULATORY (`regulatory_agent.py`)**: Assesses PMLA/AML regulatory indicators, STR reporting implications, and heuristic risk indices.
-4. **AUDIT_EXPLANATION (`audit_explanation_agent.py`)**: Generates step-by-step audit narratives, key findings, and data gap analyses.
-5. **DECISION_SUPPORT (`analyst_agent.py`)**: Synthesizes findings into review priority ratings (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) and recommended human disposition options.
-
-### Investigation Confidence Index Formula
-
-$$\text{Score} = \text{clamp}\left(\text{round}\left(0.35 \cdot C + 0.40 \cdot A + 0.25 \cdot D - 1.0 \cdot K, 1\right), 0.0, 100.0\right)$$
-
-- $C$: Evidence Completeness % (coverage across 5 core evidence dimensions)
-- $A$: Agent Severity Agreement % (consensus across evaluating agents)
-- $D$: Source Diversity % (unique evidence sources)
-- $K$: Contradiction Count Penalty (conflicts between CRITICAL and LOW ratings)
+SENTINEL implements a **Rule-Guided ML Emulator** rather than a traditional serialized model at runtime:
+- **Offline Artifact Context**: An offline scikit-learn model file `fraud_model.pkl` (`backend/backend/models/fraud_model.pkl`, trained via `backend/scripts/train_model.py`) exists in the repository from earlier development iterations.
+- **Runtime Reality**: The active runtime backend (`app/services/ml_risk_engine.py`) **does NOT load or use `fraud_model.pkl`** (and intentionally imports neither `pickle` nor `joblib`). Instead, it executes the live **Rule-Guided ML Emulator**.
+- **Design Justification**: This architecture guarantees high correlation ($r > 0.95$) with explainable rules, eliminates fragile Python pickle deserialization issues across environments, and supports deterministic pseudo-random seeds for 100% reproducible testing.
+- **Risk Bands & Noise Bounds**:
+  - High Risk ($\ge 80$): Rule score $\pm 5$ noise (tight certainty band)
+  - Medium Risk ($\ge 50$): Rule score $\pm 10$ noise (moderate uncertainty)
+  - Low Risk ($< 50$): Rule score $\pm 15$ noise (exploratory zone)
+- **Deterministic Seed**: When a seed is passed (e.g. during Benchmark Lab evaluations or regression tests), a deterministic generator (`random.Random(seed)`) is used, guaranteeing that repeated evaluation of identical inputs yields **identical scores ($\Delta = 0$)**.
 
 ---
 
-## 🤖 Autonomous Policy & Action Engine
+## 🛡️ Autonomous Policy Engine & Human Approval Boundary
 
-`evaluate_autonomous_policy()` in `app/engines/autonomous_policy_engine.py` enforces safety rules before any action is executed:
+The Autonomous Policy Engine (`app/engines/autonomous_policy_engine.py`) enforces strict compliance guardrails:
 
-- **Fail-Closed Design**: Rejects payload on missing transaction data, invalid risk scores, or closed case states (`CLOSED_CONFIRMED_FRAUD`, `CLOSED_FALSE_POSITIVE`).
-- **Automate Mode Switch**:
-  - **Automate OFF**: Routine actions default to `DO_NOT_EXECUTE` (`POL-MODE-OFF`). Manual intervention required.
-  - **Automate ON**: Autonomous execution authorized for `MONITOR`, `ENHANCED_MONITORING`, `ESCALATE_ANALYST_REVIEW`, `BLOCK`, `REJECT_TRANSACTION`, `FILE_STR`, `CLOSE_ACCOUNT`.
+### Fail-Closed Design
+Evaluations immediately return `decision: "REJECT"` if:
+- Transaction payload is missing or corrupted (`POL-ERR-NO-TX`).
+- Risk score is missing, invalid, or negative (`POL-ERR-NO-SCORE`).
+- Case status is closed (`CLOSED_CONFIRMED_FRAUD`, `CLOSED_FALSE_POSITIVE`).
 
----
+### Automate Mode Toggle
+- **Automate Mode OFF**: Routine actions default to `decision: "DO_NOT_EXECUTE"`, `policy_rule_id: "POL-MODE-OFF"`.
+- **Automate Mode ON**: Autonomous execution authorized for `MONITOR`, `ENHANCED_MONITORING`, `ESCALATE_ANALYST_REVIEW`, `BLOCK`, `FILE_STR`, `CLOSE_ACCOUNT`.
 
-## 🛡️ Human Approval Boundary & Governance
-
+### The Non-Negotiable Freeze Boundary
 > [!IMPORTANT]
-> **Account Freeze Safety Rule**:
-> `FREEZE` actions **NEVER** execute autonomously.
+> **Zero Autonomous Freezes**:
+> Under institutional safety rules, **`FREEZE` actions NEVER execute autonomously**.
 > Even when Automate Mode is ON and a transaction has a CRITICAL risk score ($\ge 85$), the policy engine returns:
 > `execution_status: "REQUIRES_OPERATOR_ACTION"`
 > 
-> An account freeze can **ONLY** be executed when a human analyst explicitly clicks **Freeze** in the UI or invokes `POST /action/freeze` / `POST /cases/{case_id}/transactions/{tx_id}/freeze`.
+> Account freezes strictly require an authorized compliance operator to click **Freeze** in the UI or call `POST /action/freeze`. Zero live banking accounts are altered without human sign-off.
 
 ---
 
-## 📁 Dynamic Case Management & Lifecycle
+## 🔍 5-Stage Multi-Agent Investigation Pipeline
 
-### Case Statuses
+When a case is opened, `investigation_orchestrator.py` asynchronously executes 5 dependency-ordered analytical stages:
 
-- **`NEW`**: Automatically created upon high-risk transaction detection.
-- **`HIGH_RISK`**: Multiple suspicious transactions linked to the case graph.
-- **`ACTIONED`**: Simulated action or manual disposition executed.
-- **`MONITORING`**: Placed under surveillance.
-- **`CLOSED` / `CLOSED_CONFIRMED_FRAUD`**: Resolved as confirmed fraud.
-- **`CLOSED_FP` / `CLOSED_FALSE_POSITIVE`**: Resolved as false positive.
+```mermaid
+flowchart LR
+    Start([Case Created]) --> STG1[1. EVIDENCE<br/>evidence_agent.py]
+    STG1 --> STG2[2. CONTEXTUAL<br/>contextual_agent.py]
+    STG2 --> STG3[3. REGULATORY<br/>regulatory_agent.py]
+    STG3 --> STG4[4. AUDIT EXPLANATION<br/>audit_explanation_agent.py]
+    STG4 --> STG5[5. DECISION SUPPORT<br/>analyst_agent.py]
+    STG5 --> Conf[Compute Investigation Confidence]
+    Conf --> Persist[(Durable Run Commit)]
+    Persist --> WS[Broadcast: investigation.completed]
+```
 
-### Recovery Calculation
+1. **Stage 1: Evidence Collection (`evidence_agent.py`)**:
+   - Gathers empirical data across 5 core dimensions: Transaction Core, Origin Baseline, Counterparty Flow, Network Graph, and Financial Exposure.
+2. **Stage 2: Contextual Investigation (`contextual_agent.py`)**:
+   - Detects behavioral patterns: rapid layered mule cascades, sudden velocity spikes, rapid drain, and account off-boarding.
+3. **Stage 3: Regulatory Risk Assessment (`regulatory_agent.py`)**:
+   - Evaluates compliance indicators under PMLA guidelines, heuristic risk indices, and Suspicious Transaction Report (STR) filing triggers.
+4. **Stage 4: Audit Explanation (`audit_explanation_agent.py`)**:
+   - Generates step-by-step forensic reasoning narratives, key findings, and explicit data gap disclosures.
+5. **Stage 5: Analyst Decision Support (`analyst_agent.py`)**:
+   - Synthesizes findings into human analyst recommendations and disposition priority ratings (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
 
-$$\text{Recoverable Amount} = \sum \text{Balances in non-withdrawn, non-frozen accounts}$$
-$$\text{Recovery \%} = \frac{\text{Recovered Assets} + \text{Recoverable Amount}}{\text{Total Fraud Exposure}} \times 100$$
+---
+
+## 📈 Investigation Confidence Index
+
+The Investigation Confidence Index measures **evidence support strength and analytical consensus**, NOT raw fraud probability.
+
+$$\text{Confidence Score} = \text{clamp}\left(\text{round}\left(0.35 \cdot C + 0.40 \cdot A + 0.25 \cdot D - 1.0 \cdot K, 1\right), 0.0, 100.0\right)$$
+
+- **$C$ (Evidence Completeness, 35%)**: Coverage across the 5 core empirical evidence categories.
+- **$A$ (Agent Agreement, 40%)**: Severity consensus across evaluating agents (Contextual, Regulatory, Decision Support).
+- **$D$ (Source Diversity, 25%)**: Ratio of distinct evidence sources utilized.
+- **$K$ (Contradiction Penalty)**: Penalty subtracted for conflicting agent severity ratings (e.g., CRITICAL vs LOW).
+
+---
+
+## 🧠 Advisory LLM Intelligence (Qwen / Ollama)
+
+SENTINEL integrates local **Qwen 3 (8B)** via Ollama (`app/services/ollama_service.py` & `app/routes/intelligence.py`):
+- **Local Endpoint**: `http://localhost:11434/api/chat` (Model: `qwen3:8b`).
+- **Standard Library Client**: Implemented using Python's built-in `urllib.request` (zero third-party LLM framework bloat).
+- **Advisory Only**: Qwen receives sanitized context containing graph topology, transaction summaries, and agent findings.
+- **Strict Guardrails**: Qwen's output is validated against Pydantic schema `AIAnalysisResponse`. It **cannot** alter risk scores, mutate database state, or trigger enforcement actions.
+- **Graceful Fallback**: If Ollama is offline or uninstalled, endpoints return `status: "unavailable"` without impacting core detection or server startup.
 
 ---
 
 ## 🕸️ Multi-Hop Graph & Network Intelligence
 
-SENTINEL builds connected investigation graphs (`app/engines/graph_engine.py`) visualized using **Cytoscape.js** (`GraphCanvas.jsx`):
-
-- **Lead Node Detection**: Account with the highest incoming transaction volume flagged as primary suspect.
-- **Graph Topology Patterns**:
-  - **Pattern A (Normal)**: Direct sender-receiver transfer.
-  - **Pattern B (3-Hop / 5-Hop Mule Chain)**: Rapid multi-account layering chain.
-  - **Pattern C (Funnel)**: Multiple victim accounts pooling into a single funnel account.
-  - **Pattern D (Fan-Out)**: Single source dispersing funds to multiple destination accounts.
-  - **Pattern E (Circular Flow)**: Closed-loop money cycling ($A \to B \to C \to D \to A$).
-
----
-
-## 📜 Audit Trail & Compliance Export
-
-SENTINEL logs immutable 21-field audit records for every mode change, transaction scoring event, autonomous decision, and analyst disposition.
-
-### CSV Export Feature (`GET /export/sentinel_audit.csv`)
-
-- **Authoritative Data Merging**: Combines repository events, in-memory actions, and case disposition histories.
-- **Dual Section Report**:
-  1. *SENTINEL Complete Action Audit Log* (16 canonical fields: Timestamp, Audit ID, Case ID, Tx ID, Account ID, Risk Score, Risk Level, Action, Execution Mode, Actor, Action Status, Previous State, Resulting State, Reason, Policy Rule ID, Operator ID).
-  2. *SENTINEL Transaction Feed Audit*.
-- **Security Sanitization**: Prepends `'` to leading formula characters (`=`, `+`, `-`, `@`, `\t`, `\r`) to prevent CSV Injection in Microsoft Excel. Includes UTF-8 BOM (`\ufeff`).
+SENTINEL constructs real-time investigation graphs (`app/engines/graph_engine.py`) visualized on the frontend using Cytoscape.js:
+- **Lead Node Suspect Detection**: Identifies the primary suspect account based on in-degree flow volume and velocity.
+- **6 Authentic Topological Archetypes (`classify_topology_archetype`)**:
+  1. `DIRECT_TRANSFER`: 2 nodes, 1 direct payment flow.
+  2. `LINEAR_CHAIN`: Sequential multi-hop mule layering ($A \to B \to C \to D$).
+  3. `FAN_OUT`: Single source rapidly dispersing funds to multiple destination accounts.
+  4. `FAN_IN`: Multiple victim accounts pooling into a single funnel account.
+  5. `STRUCTURING_PASS_THROUGH`: Rapid layered pass-through funds movement.
+  6. `CIRCULAR_LOOP`: Closed-loop money cycling returning funds to the origin ($A \to B \to C \to A$).
+- **Node Classification**: Nodes are categorized as `victim`, `mule`, `collector`, `merchant`, `cashout`, `crypto`, or `UPI`.
 
 ---
 
-## 🧠 Qwen / Ollama Advisory Intelligence
+## 💰 Asset Recovery Engine
 
-SENTINEL integrates local **Qwen 3 (8B)** via Ollama (`app/services/ollama_service.py` & `app/routes/intelligence.py`):
+SENTINEL tracks live recoverable financial exposure (`app/engines/recovery_engine.py`):
+$$\text{Recoverable Amount} = \sum \min(\text{Balance of non-withdrawn nodes}, \text{Total Fraud Amount})$$
+$$\text{Recovery \%} = \frac{\text{Recoverable Amount}}{\text{Total Fraud Exposure}} \times 100$$
+Nodes marked as `withdrawn` yield ₹0 recoverable; nodes marked as `active` or `frozen` are counted toward potential asset recovery.
 
-- **Endpoint**: `http://localhost:11434/api/chat`
-- **Role**: **Advisory Intelligence Only**.
-- **Data Boundary**: Sanitized context containing non-sensitive graph topology, primary transaction summaries, and outputs from the 5 deterministic investigation stages.
-- **Strict Constraints**: Qwen's output is parsed into structured JSON (`AIAnalysisResponse`). It **cannot** trigger actions, access database credentials, or override policy engine decisions.
-- **Graceful Fallback**: If Ollama is uninstalled or offline, the API returns `status: "unavailable"` without breaking the core application or blocking startup.
+---
+
+## 🧪 Benchmark Lab & Synthetic Testing Bench
+
+The **Benchmark Lab** (`/benchmark`) is a dedicated compliance test bench designed for non-technical presentation audiences, compliance audits, and regulatory demonstrations.
+
+### Core Architecture: Generation $\ne$ Evaluation
+1. **Phase 1: Test Transaction Generation**: Creates synthetic transaction inputs in a `NOT TESTED` / `UNEVALUATED` state. No risk scores are assumed.
+2. **Phase 2: Risk Assessment**: Routes transactions through the pure, deterministic evaluator (`benchmark_evaluator.py`).
+
+### Scenario Selection (Profile $\ne$ Result)
+Profiles define transaction input characteristics; SENTINEL's detection pipeline determines the resulting risk:
+- **Balanced Test**: Equal distribution across all standard scenarios.
+- **Large Transactions**: Payments significantly exceeding typical monthly spending.
+- **New Recipients**: Payments to beneficiaries never transacted with before.
+- **Unusual Times**: Payments initiated during high-risk late-night hours.
+- **Customer Under Pressure**: Payments where customer is on an active call (coercion).
+- **Money Movement Chain**: Layered pass-through funds across chained accounts.
+- **Multiple Warning Signs**: Compound threat combining multiple indicators.
+
+### 7-Step Guided Transaction Builder (`CustomTransactionModal.jsx`)
+Allows presenters to configure custom test transactions step-by-step:
+1. **Basics**: Sender & Recipient account IDs (`ACC-109283` $\to$ `ACC-948201`).
+2. **Amount**: Currency input with quick presets (`₹5,000 Routine`, `₹25,000 Typical`, `₹75,000 High`, `₹2,50,000 Very High`).
+3. **Payment Method**: Selectable cards for `UPI`, `IMPS`, `NEFT`, `Card`, and `Net Banking`.
+4. **Time**: Visual cards for `☀ Daytime` vs `🌙 Late Night`.
+5. **Warning Signs Checklist**: 8 full-card clickable checkboxes with live selection counter.
+6. **Customer Baseline**: Monthly spending baseline to contextualize transaction size.
+7. **Review**: Summary card before running evaluation.
+
+### Execution Modes: Single-Transaction vs. Batch Evaluation
+
+The Benchmark Lab supports two distinct execution paths:
+1. **Batch Evaluation (`POST /benchmark/runs/{run_id}/evaluate`)**:
+   - Iterates through all remaining `UNEVALUATED` transactions in a batch.
+   - Evaluates each transaction through the deterministic pipeline and calculates batch summary statistics (distribution across Low, Medium, High, Critical tiers; mean scores; action breakdown).
+2. **Single-Transaction Evaluation (`POST /benchmark/runs/{run_id}/transactions/{tx_id}/evaluate`)**:
+   - Evaluates an individual transaction in complete isolation without evaluating or mutating the rest of the batch.
+   - Ideal for live compliance demonstrations and pinpoint deep-dives into a specific customer's risk factors.
+   - Leaves all other transactions in their existing state (`UNEVALUATED` or previously evaluated).
+
+### Deterministic Reevaluation & Zero Side-Effect Guarantee ($\Delta = 0$)
+
+In production simulation, evaluating a transaction can update an account's velocity or historical balances. To ensure pure scientific benchmarking, the Benchmark Lab introduces `EvaluationInputSnapshot` (a frozen dataclass):
+- **Isolation**: Benchmark evaluation reads sender/receiver state at the moment of creation, never mutating the runtime account store during evaluation.
+- **Repeat Reproducibility**: Re-running evaluation on the same transaction $N$ times (or reevaluating an entire batch) produces exact zero-drift matches:
+```
+Previous assessment: 86 — CRITICAL (Rule: 84.5, ML: 87.0)
+Current assessment:  86 — CRITICAL (Rule: 84.5, ML: 87.0)
+RESULT MATCHED (No score drift, Δ = 0.0)
+```
+- **Audit Export**: Full evaluation results and factor breakdowns can be exported as an immutable CSV report via `GET /benchmark/runs/{run_id}/export`.
+
+---
+
+## 📊 Analytics & Telemetry Dashboard
+
+The Analytics Dashboard (`/dashboard`) presents an authentic 6-tier analytical story derived strictly from backend state:
+1. **Tier 01 // Executive Summary**: Total Ingested Transactions, High-Risk Alerts, Average Risk Score, and Cases Resolved.
+2. **Tier 02 // Risk Situation Analysis**: Real-time Risk Score Trend Area Chart and Risk Level Distribution Breakdown.
+3. **Tier 03 // Threat Intelligence Telemetry**: Detected AML pattern counts and Payment Channel Risk Profiles.
+4. **Tier 04 // Investigation Pipeline Performance**: Pipeline stage processing latencies and Investigation Confidence distribution.
+5. **Tier 05 // Enforcement & Automation Performance**: Policy action distribution, Automation rate %, and Human Approval metrics.
+6. **Tier 06 // Investigation Impact & Financial Outcomes**: Total Fraud Exposure, Recovered Amount, Net Loss, and Recovery Rate %.
+
+*Note: In accordance with clean analytical separation, Subsystem Vitals and Network Graph views are housed in their dedicated workstation (`/graph`) rather than crowding the Analytics dashboard.*
+
+---
+
+## ⚡ Real-Time WebSocket Architecture & Presentation Mode
+
+### WebSocket Stream (`ws://localhost:8000/ws`)
+Maintains continuous real-time communication between FastAPI and React clients. If disconnected, the frontend automatically falls back to HTTP polling every 2 seconds.
+
+### Presentation Mode (`usePresentationMode.js`)
+During live hackathon demos or jury presentations, critical-risk popups can obscure the screen.
+- **Alert Mode (Default)**: Critical-risk transactions trigger full-screen toasts and alert banners.
+- **Presentation Mode (Active)**: Mutes disruptive visual popups/toasts.
+- **Safety Guarantee**: Does **NOT** suppress underlying events, does not alter risk scores, does not disable case creation, and does not alter audit logging. State persists in `localStorage`.
+
+---
+
+## 🖥️ Frontend Application & Navigation
+
+| Route | Page | Purpose |
+| :--- | :--- | :--- |
+| **`/feed`** | **Real-Time Feed** | High-velocity live transaction stream, real-time risk badges, amount scaler indicators, and quick filters. |
+| **`/dashboard`** | **Analytics** | 6-tier forensic telemetry story, volume trends, policy action distributions, and recovery metrics. |
+| **`/cases`** | **Cases Workbench** | Active case management, multi-agent stage report viewers, golden hour timers, and manual disposition actions. |
+| **`/benchmark`** | **Benchmark Lab** | Controlled testing lab, minimal test setup, 7-step transaction builder, and zero-drift repeat testing. |
+| **`/graph/:caseId`** | **Graph Workstation** | Interactive Cytoscape.js network visualization, topological layer inspector, and node freezing controls. |
+
+---
+
+## 🔐 Authentication & Role Simulation
+
+SENTINEL implements a client-side role simulator (`roleStore.js`):
+- **Access Tiers**: `admin` (Full access to automation controls and dispositions) and `operator` (Read-only observation).
+- **Session**: Stored in browser `localStorage` (`sentinel_role`).
+- **Demo Scope**: Intended for compliance jury demonstration convenience; does not represent server-side JWT/OAuth2 security.
+
+---
+
+## 🗄️ Database Architecture & Persistence Models
+
+SENTINEL provides dual persistence capabilities:
+- **In-Memory Store (`app/core/data_store.py`)**: Default for rapid development and testing. Thread-safe dictionaries pre-seeded with authentic multi-tier demo scenarios on startup (`seed_data.py`).
+- **PostgreSQL Database (`app/models/`)**: Production durability via SQLAlchemy 2.0 AsyncSession and Alembic migrations (`alembic/`).
+
+### Active Database Entities (Exactly 7 SQLAlchemy ORM Models)
+
+The database schema is defined across **7 active SQLAlchemy models** in `app/models/`:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      DATABASE ENTITIES (7 ORM MODELS)                   │
+├───────────────────────┬──────────────────────┬──────────────────────────┤
+│ Model Class           │ Table Name           │ Primary Purpose          │
+├───────────────────────┼──────────────────────┼──────────────────────────┤
+│ Account               │ accounts             │ KYC status, balance, risk│
+│ Transaction           │ transactions         │ Financial transfers & log│
+│ Case                  │ cases                │ AML cases & risk tiers   │
+│ InvestigationRun      │ investigation_runs   │ Multi-agent stage state  │
+│ InvestigationReport   │ investigation_reports│ Stage outputs & evidence │
+│ Disposition           │ dispositions         │ Analyst resolution & STR │
+│ AuditEvent            │ audit_events         │ Immutable 21-field audit │
+└───────────────────────┴──────────────────────┴──────────────────────────┘
+```
 
 ---
 
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Framework**: FastAPI (Python 3.10+)
+- **Python**: `3.10+` (Tested on 3.12 / 3.13)
+- **Framework**: FastAPI & Starlette
 - **ASGI Server**: Uvicorn
-- **Concurrency**: Python `asyncio` & WebSockets
-- **ORM / Database**: SQLAlchemy 2.0 (AsyncSession), PostgreSQL (`asyncpg`, `psycopg2-binary`), Alembic migrations
+- **ORM**: SQLAlchemy 2.0 (AsyncSession)
+- **Database Drivers**: `asyncpg`, `psycopg2-binary`
+- **Migrations**: Alembic
 - **Validation**: Pydantic v2
-- **Advisory LLM Client**: Standard library `urllib.request` (zero third-party LLM SDK dependencies)
+- **Testing**: `pytest`, `unittest`
 
 ### Frontend
-- **Framework**: React 18 & Vite 5
-- **Styling**: TailwindCSS & PostCSS
-- **Graph Visualization**: Cytoscape.js & `cytoscape-dagre` layout
-- **Analytics Charts**: Recharts
+- **JavaScript Framework**: React 18
+- **Build Tool**: Vite 5
+- **Styling**: Tailwind CSS & PostCSS
+- **Graph Visualization**: Cytoscape.js & `cytoscape-dagre`
+- **Charts**: Recharts
 - **Icons**: Lucide React
 - **Routing**: React Router v6
 
@@ -311,155 +465,109 @@ SENTINEL integrates local **Qwen 3 (8B)** via Ollama (`app/services/ollama_servi
 ## 📂 Repository Structure
 
 ```
-sentinel/
-├── backend/
-│   ├── app/
-│   │   ├── core/
-│   │   │   ├── config.py              # Risk scoring weights & parameters
-│   │   │   ├── constants.py           # Enums & constants
-│   │   │   ├── data_store.py          # In-memory store dict
-│   │   │   └── models/                # Core domain schemas
-│   │   ├── db/
-│   │   │   ├── config.py              # PostgreSQL database settings
-│   │   │   └── session.py             # AsyncSession engine & factory
-│   │   ├── engines/
-│   │   │   ├── scoring_engine.py      # Rule-based risk scoring
-│   │   │   ├── case_manager.py        # Case linking & creation
-│   │   │   ├── graph_engine.py        # Cytoscape graph builder
-│   │   │   ├── recovery_engine.py     # Asset recovery calculation
-│   │   │   ├── response_policy_engine.py
-│   │   │   └── autonomous_policy_engine.py # Phase 16 safety & policy rules
-│   │   ├── models/                    # SQLAlchemy database entities
-│   │   ├── repositories/
-│   │   │   ├── base.py                # AbstractCaseRepository interface
-│   │   │   ├── in_memory.py           # In-memory store adapter
-│   │   │   ├── postgres.py            # PostgreSQL database adapter
-│   │   │   └── dependencies.py        # FastAPI Dependency Injection
-│   │   ├── routes/
-│   │   │   └── intelligence.py        # Qwen / Ollama advisory endpoints
-│   │   ├── services/
-│   │   │   ├── orchestrator.py        # Transaction pipeline orchestrator
-│   │   │   ├── ml_risk_engine.py      # Rule-Guided ML Emulator
-│   │   │   ├── simulated_action_executor.py # Action executor & audit logger
-│   │   │   ├── investigation_orchestrator.py # 5-Stage investigation pipeline
-│   │   │   ├── evidence_agent.py      # Stage 1 Evidence Agent
-│   │   │   ├── contextual_agent.py    # Stage 2 Contextual Agent
-│   │   │   ├── regulatory_agent.py    # Stage 3 Regulatory Risk Agent
-│   │   │   ├── audit_explanation_agent.py # Stage 4 Audit Explanation Agent
-│   │   │   ├── analyst_agent.py       # Stage 5 Decision Support Agent
-│   │   │   ├── case_lifecycle_agent.py# Case disposition service
-│   │   │   ├── mock_apis.py           # Mock agency APIs
-│   │   │   └── ollama_service.py      # Ollama / Qwen HTTP client
-│   │   └── utils/
-│   │       └── id_generator.py        # Unique ID generator
-│   ├── alembic/                       # Database migration scripts
-│   ├── simulator/
-│   │   └── simulator.py               # Transaction stream generator
-│   ├── tests/                         # 37 comprehensive test suites
-│   ├── main.py                        # FastAPI entry point & WebSocket server
-│   └── requirements.txt               # Backend Python dependencies
-├── frontend/
-│   ├── src/
-│   │   ├── components/                # Reusable UI components
-│   │   │   ├── ActionButton.jsx
-│   │   │   ├── ActionTakenToast.jsx
-│   │   │   ├── AnalystEvidenceViewer.jsx
-│   │   │   ├── AttackModeToggle.jsx
-│   │   │   ├── AutomateModeToggle.jsx
-│   │   │   ├── CaseCard.jsx
-│   │   │   ├── CenterFlow.jsx
-│   │   │   ├── ErrorBoundary.jsx
-│   │   │   ├── FactorBreakdown.jsx
-│   │   │   ├── GoldenTimer.jsx
-│   │   │   ├── InvestigationSidebar.jsx
-│   │   │   ├── InvestigationWorkflowGraph.jsx
-│   │   │   ├── LiveAlertToast.jsx
-│   │   │   ├── Login.jsx
-│   │   │   ├── RiskBadge.jsx
-│   │   │   ├── RiskScoreTrend.jsx
-│   │   │   └── SystemStatusBar.jsx
-│   │   ├── hooks/
-│   │   │   └── useWebSocket.js        # Global WebSocket & polling store
-│   │   ├── modules/
-│   │   │   └── GraphModule/           # Cytoscape graph visualization module
-│   │   ├── pages/
-│   │   │   ├── Feed.jsx               # Real-time transaction feed
-│   │   │   ├── Dashboard.jsx          # Analytics & Telemetry dashboard
-│   │   │   ├── Cases.jsx              # Case workbench & investigation stages
-│   │   │   └── Graph.jsx              # Interactive graph workstation
-│   │   ├── services/
-│   │   │   └── exportAuditLog.js      # Frontend audit export trigger
-│   │   ├── roleStore.js               # Simple role state management
-│   │   ├── App.jsx                    # Navigation & layout router
-│   │   ├── main.jsx                   # React entry point
-│   │   └── index.css                  # Global Tailwind CSS styles
-│   ├── package.json
-│   └── vite.config.js
-└── README.md
+sentinel-fincrime-platform/
+└── sentinel/
+    ├── backend/
+    │   ├── alembic/                       # Database migration versions
+    │   ├── app/
+    │   │   ├── core/
+    │   │   │   ├── config.py              # Rule weights & thresholds
+    │   │   │   ├── constants.py           # Enums & system constants
+    │   │   │   ├── data_store.py          # In-memory store dictionary
+    │   │   │   └── seed_data.py           # Authentic demo scenario seed
+    │   │   ├── db/
+    │   │   │   ├── config.py              # PostgreSQL database URL setup
+    │   │   │   └── session.py             # SQLAlchemy async engine & session
+    │   │   ├── engines/
+    │   │   │   ├── autonomous_policy_engine.py  # Phase 16 safety & policy rules
+    │   │   │   ├── benchmark_evaluator.py # Pure deterministic risk evaluator
+    │   │   │   ├── case_manager.py        # Case linking & creation logic
+    │   │   │   ├── graph_engine.py        # Network graph & topology builder
+    │   │   │   ├── recovery_engine.py     # Asset recovery calculation
+    │   │   │   └── scoring_engine.py      # Rule-based risk scoring engine
+    │   │   ├── models/                    # SQLAlchemy database entities
+    │   │   ├── repositories/              # In-memory & PostgreSQL adapters
+    │   │   ├── routes/
+    │   │   │   ├── benchmark.py           # Benchmark Lab REST endpoints
+    │   │   │   └── intelligence.py        # Qwen / Ollama advisory routes
+    │   │   └── services/
+    │   │       ├── analyst_agent.py       # Stage 5 Decision Support Agent
+    │   │       ├── audit_explanation_agent.py # Stage 4 Audit Explanation Agent
+    │   │       ├── benchmark_service.py   # Benchmark generation & tracking
+    │   │       ├── case_lifecycle_agent.py# Disposition & case history
+    │   │       ├── contextual_agent.py    # Stage 2 Contextual Agent
+    │   │       ├── evidence_agent.py      # Stage 1 Evidence Agent
+    │   │       ├── ml_risk_engine.py      # Rule-Guided ML Emulator
+    │   │       ├── mock_apis.py           # Simulated external banking APIs
+    │   │       ├── ollama_service.py      # Ollama / Qwen HTTP client
+    │   │       ├── orchestrator.py        # Pipeline orchestrator
+    │   │       ├── regulatory_agent.py    # Stage 3 Regulatory Agent
+    │   │       └── simulated_action_executor.py # Action execution & audit log
+    │   ├── simulator/
+    │   │   └── simulator.py               # Transaction stream generator
+    │   ├── tests/                         # 37 backend automated test suites
+    │   ├── main.py                        # FastAPI entry point & WebSocket server
+    │   └── requirements.txt               # Backend Python dependencies
+    ├── frontend/
+    │   ├── src/
+    │   │   ├── components/                # Modals, toasts, toggles, badges
+    │   │   │   ├── ActionButton.jsx
+    │   │   │   ├── ActionTakenToast.jsx
+    │   │   │   ├── AttackModeToggle.jsx
+    │   │   │   ├── AutomateModeToggle.jsx
+    │   │   │   ├── CustomTransactionModal.jsx  # 7-step guided transaction builder
+    │   │   │   ├── InvestigationSidebar.jsx
+    │   │   │   ├── InvestigationWorkflowGraph.jsx
+    │   │   │   ├── LiveAlertToast.jsx
+    │   │   │   ├── Login.jsx
+    │   │   │   ├── PresentationModeIndicator.jsx
+    │   │   │   ├── PresentationModeToggle.jsx
+    │   │   │   ├── RiskBadge.jsx
+    │   │   │   └── SystemStatusBar.jsx
+    │   │   ├── hooks/
+    │   │   │   ├── usePresentationMode.js # Presentation mode hook & state
+    │   │   │   └── useWebSocket.js        # WebSocket listener & polling hook
+    │   │   ├── modules/
+    │   │   │   └── GraphModule/           # Cytoscape graph canvas & controls
+    │   │   ├── pages/
+    │   │   │   ├── BenchmarkLab.jsx       # Benchmark Lab page
+    │   │   │   ├── Cases.jsx              # Case investigation page
+    │   │   │   ├── Dashboard.jsx          # 6-tier analytics page
+    │   │   │   ├── Feed.jsx               # Real-time transaction feed
+    │   │   │   └── Graph.jsx              # Dedicated graph workstation
+    │   │   ├── roleStore.js               # Client-side persona state
+    │   │   ├── App.jsx                    # Root router & layout navigation
+    │   │   ├── main.jsx                   # React application entry point
+    │   │   └── index.css                  # Tailwind styles
+    │   ├── tests/                         # Frontend test suites (Node runner)
+    │   ├── package.json
+    │   └── vite.config.js
+    └── README.md
 ```
-
----
-
-## 📦 Dependencies & Requirements
-
-### Required Runtimes
-- **Python**: `3.10+` (Tested on Python 3.13.13)
-- **Node.js**: `16+` (Tested on Node.js v24.16.0)
-- **npm**: `8+` (Tested on npm 11.13.0)
-
-### Backend Dependencies (`requirements.txt`)
-- `fastapi` (Web framework)
-- `uvicorn` (ASGI server)
-- `pydantic` (Data validation)
-- `websockets` (WebSocket protocol support)
-- `sqlalchemy>=2.0.0` (Async ORM)
-- `asyncpg>=0.28.0` (Async PostgreSQL driver)
-- `psycopg2-binary>=2.9.0` (PostgreSQL driver)
-- `alembic>=1.12.0` (Database migrations)
-- `requests` (Simulator HTTP requests)
-
-### Frontend Dependencies (`package.json`)
-- `react` & `react-dom` (`^18.2.0`)
-- `react-router-dom` (`^6.22.2`)
-- `vite` (`^5.1.4`)
-- `tailwindcss` (`^3.4.1`)
-- `cytoscape` (`^3.28.1`) & `cytoscape-dagre` (`^4.0.1`)
-- `recharts` (`^2.12.2`)
-- `lucide-react` (`^0.344.0`)
-- `clsx` & `tailwind-merge`
-
----
-
-## ⚙️ Environment Configuration
-
-| Variable | Default | Purpose |
-| :--- | :--- | :--- |
-| `SENTINEL_MODE` | `development` | Operating mode (`development` uses in-memory store; `production` requires PostgreSQL) |
-| `DATABASE_URL` | *None* | PostgreSQL connection string (e.g. `postgresql+asyncpg://user:pass@localhost:5432/sentinel`) |
-| `CORS_ORIGINS` | *Localhost defaults* | Comma-separated list of allowed CORS origins |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL for local Ollama service |
-| `OLLAMA_MODEL` | `qwen3:8b` | Model name for advisory Qwen intelligence |
-| `OLLAMA_TIMEOUT` | `60` | Request timeout in seconds for Ollama API calls |
-| `SENTINEL_STALE_RUN_THRESHOLD_SECONDS` | `600` | Stale investigation run recovery threshold |
 
 ---
 
 ## 🔧 Local Installation & Setup
 
-### 1. Repository Setup
+### Prerequisites
+- **Python**: `3.10` or higher
+- **Node.js**: `18` or higher
+- **npm**: `8` or higher
+- **(Optional) Ollama**: Installed locally with `qwen3:8b` for advisory narratives
+
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/adityahadagalle/sentinel-fincrime-platform.git
 cd sentinel-fincrime-platform/sentinel
 ```
 
-### 2. Backend Environment Setup
+### 2. Backend Setup
 ```bash
 cd backend
 
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv venv
 
-# Activate virtual environment
 # Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
 # macOS/Linux:
@@ -472,36 +580,34 @@ pip install -r requirements.txt
 ### 3. Frontend Setup
 ```bash
 cd ../frontend
-
-# Install Node modules
 npm install
 ```
 
 ---
 
-## 🏃 Local Run Instructions
+## 🏃 Running the Application
 
-To run SENTINEL locally, start the components in separate terminal windows:
+Start the backend and frontend in separate terminal windows:
 
-### Terminal 1: Backend FastAPI Server
+### Terminal 1: Backend Server (FastAPI)
 ```bash
 cd sentinel/backend
 # Activate virtual environment if not active
 .\venv\Scripts\Activate.ps1  # Windows
 # source venv/bin/activate    # macOS/Linux
 
-python main.py
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-*Backend will start on **http://localhost:8000** (Swagger API Docs at **http://localhost:8000/docs**).*
+*Backend runs on **http://localhost:8000** (OpenAPI documentation available at **http://localhost:8000/docs**).*
 
-### Terminal 2: Frontend React Application
+### Terminal 2: Frontend Client (React + Vite)
 ```bash
 cd sentinel/frontend
 npm run dev
 ```
-*Frontend will start on **http://localhost:5173**.*
+*Frontend runs on **http://localhost:5173**.*
 
-### Terminal 3: (Optional) Transaction Simulator
+### Terminal 3: (Optional) Transaction Stream Simulator
 ```bash
 cd sentinel/backend
 # Activate virtual environment if not active
@@ -509,107 +615,146 @@ cd sentinel/backend
 
 python simulator/simulator.py
 ```
-*Pumps simulated multi-scenario transactions into the backend at 6 tx/min.*
+*Generates continuous multi-hop transaction streams into the backend.*
 
 ---
 
 ## 📡 API Reference
 
-### Core Endpoints
+SENTINEL exposes **62 active REST and WebSocket endpoints** across core detection, case investigation, autonomous actions, benchmark lab, and advisory intelligence (49 in `main.py`, 11 in `benchmark.py`, 2 in `intelligence.py`).
 
-| Method | Endpoint | Description |
+### 1. Ingestion, Core Detection & Analytics (`main.py`)
+
+| Method | Route | Description |
 | :--- | :--- | :--- |
-| `GET` | `/health` | Application & database health check |
-| `POST` | `/transaction` | Ingest and score a new transaction |
-| `GET` | `/cases` | Retrieve all investigation cases |
-| `GET` | `/cases/{case_id}` | Retrieve specific case details & payload |
-| `GET` | `/cases/{case_id}/graph` | Fetch Cytoscape graph structure for a case |
-| `POST` | `/cases/{case_id}/investigate` | Trigger/re-run 5-stage investigation pipeline |
-| `GET` | `/cases/{case_id}/investigation` | Get comprehensive investigation read model |
-| `POST` | `/cases/{case_id}/disposition` | Submit analyst disposition (state transition) |
-| `GET` | `/cases/{case_id}/history` | Fetch complete case disposition & audit history |
-| `POST` | `/action/freeze` | Execute operator-authorized account freeze |
-| `GET` | `/automation-mode` | Get current Automate Mode status |
-| `POST` | `/automation-mode` | Enable/disable Automate Mode |
-| `POST` | `/attack-mode` | Trigger 5-hop attack chain simulation |
-| `POST` | `/simulate/multi_hop_scenario/{id}` | Trigger multi-hop scenarios (Scenarios 1–6) |
-| `GET` | `/analytics/overview` | Fetch comprehensive analytics & telemetry KPIs |
-| `GET` | `/export/sentinel_audit.csv` | Download complete 16-field CSV audit log |
-| `GET` | `/intelligence/health` | Check local Ollama reachability |
-| `POST` | `/intelligence/analyze` | Request Qwen 3 advisory case analysis |
+| `GET` | `/health` | System health check (DB connectivity & uptime) |
+| `POST` | `/transaction` | Ingest and score a live transaction stream event |
+| `GET` | `/analytics/overview` | Telemetry payload for 6-tier analytics dashboard |
+| `GET` | `/export/sentinel_audit.csv` | Download complete UTF-8 BOM CSV audit report |
+
+### 2. Cases & Network Graphs (`main.py`)
+
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `GET` | `/cases` | Retrieve all open and resolved investigation cases |
+| `GET` | `/cases/{case_id}` | Retrieve specific case details, accounts, and transactions |
+| `GET` | `/cases/{case_id}/graph` | Fetch normalized Cytoscape graph nodes, edges, and topologies |
+| `GET` | `/transactions/{tx_id}/graph` | Fetch counterparty graph centered around specific transaction |
+| `POST` | `/cases/{case_id}/disposition` | Submit analyst disposition, notes, and case resolution |
+| `GET` | `/cases/{case_id}/history` | Fetch complete historical audit trail of case dispositions |
+
+### 3. Multi-Agent Investigation Pipeline (`main.py`)
+
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `POST` | `/cases/{case_id}/investigate` | Trigger or re-run full 5-stage automated investigation pipeline |
+| `GET` | `/cases/{case_id}/investigation-status`| Query current status and progress of ongoing investigation |
+| `GET` | `/cases/{case_id}/investigation-runs` | Retrieve all historical multi-agent execution runs |
+| `GET` | `/cases/{case_id}/investigation-runs/{run_id}` | Retrieve specific execution run details and logs |
+| `GET` | `/cases/{case_id}/reports/{report_type}` | Fetch specific stage report (`evidence`, `contextual`, `regulatory`, `audit`, `decision`) |
+| `GET` | `/cases/{case_id}/evidence` | Stage 1: Evidence collection summary |
+| `GET` | `/cases/{case_id}/regulatory-assessment` | Stage 3: Regulatory compliance assessment |
+| `GET` | `/cases/{case_id}/audit-explanation` | Stage 4: Transparent factor audit breakdown |
+| `GET` | `/cases/{case_id}/decision-support` | Stage 5: Decision support recommendations |
+| `POST` | `/cases/{case_id}/transactions/{tx_id}/freeze` | Freeze account associated with transaction in case |
+| `POST` | `/transactions/{tx_id}/freeze` | Direct account freeze targeting transaction |
+
+### 4. Governance, Policy & Simulated Actions (`main.py`)
+
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `GET` | `/automation-mode` | Get current Automate Mode status (`true` / `false`) |
+| `POST` | `/automation-mode` | Toggle Automate Mode ON or OFF |
+| `POST` | `/attack-mode` | Trigger simulated attack stream |
+| `POST` | `/simulate/multi_hop_scenario/{scenario_id}` | Inject complex multi-hop laundering topology |
+| `POST` | `/action/freeze` | **Human Operator Authorization** for account freeze |
+| `POST` | `/action/block` | Block specific transaction transfer |
+| `POST` | `/action/reject` | Reject transaction |
+| `POST` | `/action/escalate` | Escalate to senior compliance queue |
+| `POST` | `/action/flag` | Flag account / transaction for enhanced monitoring |
+| `POST` | `/action/alert` | Generate high-priority analyst notification |
+| `POST` | `/action/monitor` | Place account on standard watch |
+| `POST` | `/action/enhanced_monitoring` | Place account on heightened surveillance |
+| `POST` | `/action/file_str` | Prepare automated Suspicious Transaction Report (STR) |
+| `POST` | `/action/close_account` | Permanently terminate account |
+| `POST` | `/action/close` | Close case as confirmed fraud |
+| `POST` | `/action/close_fp` | Close case as false positive |
+
+### 5. Benchmark Lab (`benchmark.py`)
+
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `GET` | `/benchmark/profiles` | List 7 standard benchmark scenario profiles |
+| `POST` | `/benchmark/generate` | Generate synthetic batch in `UNEVALUATED` state |
+| `POST` | `/benchmark/start` | Trigger automated generation and evaluation workflow |
+| `POST` | `/benchmark/runs/{run_id}/evaluate` | Batch evaluate all pending unevaluated transactions |
+| `POST` | `/benchmark/runs/{run_id}/transactions/{tx_id}/evaluate` | Evaluate an individual transaction in isolation |
+| `POST` | `/benchmark/custom-evaluate` | Test custom transaction parameters standalone |
+| `POST` | `/benchmark/runs/{run_id}/add-input` | Add custom transaction into active batch |
+| `GET` | `/benchmark/runs` | Retrieve benchmark run history ledger |
+| `GET` | `/benchmark/runs/{run_id}` | Retrieve run status, metrics, and transaction list |
+| `POST` | `/benchmark/runs/{run_id}/cancel` | Cancel in-progress benchmark run |
+| `GET` | `/benchmark/runs/{run_id}/export` | Export benchmark run audit CSV |
+
+### 6. Advisory Intelligence (`intelligence.py`)
+
+| Method | Route | Description |
+| :--- | :--- | :--- |
+| `GET` | `/intelligence/health` | Check local Ollama reachability and `qwen3:8b` status |
+| `POST` | `/intelligence/analyze` | Request Qwen 3 advisory case narrative synthesis |
 
 ---
 
 ## ⚡ WebSocket Event Reference
 
-Connect to `ws://localhost:8000/ws`.
+Connect to `ws://localhost:8000/ws`:
 
-| Event Name | Description |
-| :--- | :--- |
-| `connected` | Initial connection confirmation (`status: "LIVE"`) |
-| `tx_scored` | Emitted whenever a transaction is scored |
-| `case_updated` | Emitted whenever a case payload or status updates |
-| `transaction.action` | Emitted when an action is evaluated or executed |
-| `automation.action.executed` | Emitted on successful autonomous action execution |
-| `automation.action.requires_operator` | Emitted when FREEZE requires human approval |
-| `automation.mode.changed` | Emitted when Automate Mode is toggled ON/OFF |
+| Event Identifier | Payload Highlights | Trigger Condition |
+| :--- | :--- | :--- |
+| `connected` | `{"status": "LIVE"}` | Client handshake established |
+| `tx_scored` | `transaction`, `execution_record` | Transaction evaluated by risk engine |
+| `case_updated` | `case_id`, `nodes`, `edges`, `risk_level` | Case graph or status changed |
+| `transaction.action` | `action_id`, `action`, `target_id` | Policy action evaluated or executed |
+| `automation.action.executed` | `action`, `status`, `actor` | Autonomous action applied |
+| `automation.action.requires_operator` | `action: "FREEZE"`, `reason` | Action requires human operator sign-off |
+| `automation.mode.changed` | `automate_mode: bool` | Automate Mode toggled ON or OFF |
+| `sentinel_benchmark_progress` | `run_id`, `pct`, `processed`, `successful` | Benchmark batch evaluation in progress |
+| `sentinel_benchmark_completed` | `run_id`, `total_requested`, `summary` | Benchmark evaluation finished |
 
 ---
 
 ## 🧪 Testing & Quality Assurance
 
-SENTINEL includes 37 automated test suites under `sentinel/backend/tests/`.
-
-### Running Tests
-
-```bash
-cd sentinel/backend
-.\venv\Scripts\python.exe -m unittest discover -s tests
+### Frontend Regression & AST Scope Suite
+Validates AST scope cleanliness and zero undeclared identifiers in the React application:
+```powershell
+node --test sentinel/frontend/tests/test_benchmark_regression.test.js
+```
+Runs full frontend test suite (Presentation Mode + Benchmark Integrity):
+```powershell
+npm test --prefix sentinel/frontend
 ```
 
-### Test Coverage Highlights
+### Production Build Validation
+```powershell
+npm run build --prefix sentinel/frontend
+```
 
-- `test_phase16_autonomous_engine.py`: Validates deterministic policy rules & fail-closed safety.
-- `test_investigation_orchestrator.py`: Validates 5-stage pipeline ordering & stage persistence.
-- `test_investigation_confidence.py`: Validates deterministic Investigation Confidence calculation.
-- `test_cases_ws_csv_pg.py`: Validates CSV export field structure, formula injection escaping, and UTF-8 BOM.
-- `test_ollama_intelligence.py`: Validates Qwen advisory data boundaries and error handling.
-- `test_postgres_integration.py`: Validates database repository operations and Alembic schema alignment.
-
----
-
-## 📝 Development Notes
-
-- **Zero DB Setup by Default**: In development mode, SENTINEL defaults to in-memory storage (`data_store.py`). No PostgreSQL database server is required to run the full application locally.
-- **Hot Module Replacement**: Vite automatically reloads frontend changes instantly during development.
-- **StatReload**: Uvicorn automatically reloads backend Python changes on save.
+### Backend Test Suite (Pytest)
+Validates deterministic scoring, multi-hop decay, policy rules, and route lifecycles:
+```powershell
+pytest sentinel/backend/tests/test_benchmark_reproducibility.py sentinel/backend/tests/test_benchmark_routes.py sentinel/backend/tests/test_benchmark_service.py -v
+```
 
 ---
 
-## 🔐 Security & Governance Boundaries
+## 🔮 Current Limitations & Extension Areas
 
-1. **Non-Autonomous Freezes**: FREEZE actions are strictly gated behind human operator approval.
-2. **Deterministic Precedence**: AI recommendations from Qwen can **never** override policy decisions or execute code.
-3. **Data Sanitization**: Prompt contexts sent to Ollama are stripped of passwords, tokens, API keys, and environment variables.
-4. **CSV Injection Protection**: All string fields in CSV audit exports starting with `=`, `+`, `-`, `@`, `\t`, or `\r` are escaped with `'`.
-
----
-
-## ⚠️ Current Limitations
-
-- **Simulated Financial APIs**: Actions against banks, telecom providers, and law enforcement are simulated via local state changes (`mock_apis.py`).
-- **Rule-Guided ML Emulator**: Default ML scoring uses a correlated statistical emulator rather than a trained binary classifier pickle file.
-- **Local Ollama Dependency**: Qwen intelligence requires a local installation of Ollama running `qwen3:8b`. (If missing, the UI gracefully indicates advisory AI is unavailable).
+1. **Simulated External APIs**: Interventions against commercial banks, telecom carriers, and law enforcement are currently executed in a simulated sandbox environment (`mock_apis.py`).
+2. **Rule-Guided ML Emulator**: Default machine learning scoring uses an emulator tracking rule scores ($r > 0.95$) with risk-band noise. A future extension will integrate an ONNX runtime serving a trained model.
+3. **Client-Side Role Persona**: Current authentication simulates `admin` vs `operator` personas in `localStorage`. Production deployment should replace this with JWT-based OAuth2 / OIDC authentication.
+4. **Local Ollama Requirement**: Advisory narrative generation requires a local instance of Ollama running `qwen3:8b`. If Ollama is offline, the platform operates seamlessly in deterministic mode.
 
 ---
 
-## 🔮 Future Extension Areas
-
-- **Live Bank Core Integrations**: Connect mock API handlers to real ISO 20022 / Open Banking APIs.
-- **Production ML Model Deployment**: Integrate ONNX Runtime or XGBoost model serving into `ml_risk_engine.py`.
-- **Advanced Graph Algorithms**: Implement Louvain community detection and PageRank centrality directly in `graph_engine.py`.
-- **Multi-Tenant Authorization**: Expand `roleStore.js` into JWT-based OAuth2 / OIDC role-based access control.
-
----
-
-*SENTINEL FinCrime Platform — Real-Time Detection, Autonomous Investigation, Strict Governance.*
+*SENTINEL FinCrime Platform — Real-Time Detection, Autonomous Investigation, Strict Human Governance.*
