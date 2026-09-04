@@ -13,6 +13,14 @@ export default defineConfig({
   server: {
     proxy: {
       '/analytics': 'http://localhost:8000',
+      '/benchmark': {
+        target: 'http://localhost:8000',
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('html')) {
+            return '/index.html'
+          }
+        }
+      },
       '/intelligence': 'http://localhost:8000',
       '/automation-mode': 'http://localhost:8000',
       '/action': 'http://localhost:8000',

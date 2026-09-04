@@ -1,13 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldAlert, AlertTriangle, Activity, Lock, CheckCircle2, XCircle, Zap, Bot, MinusCircle } from 'lucide-react';
+import { usePresentationMode } from '../hooks/usePresentationMode';
+import { getPresentationMode } from '../presentationStore';
 
 const ActionTakenToast = () => {
+  const { isPresentationMode } = usePresentationMode();
   const [activeAction, setActiveAction] = useState(null);
   const timerRef = useRef(null);
   const seenActionsRef = useRef(new Map());
 
+  // Clear active action toast immediately if Presentation Mode is activated
+  useEffect(() => {
+    if (isPresentationMode) {
+      setActiveAction(null);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [isPresentationMode]);
+
   useEffect(() => {
     const handleAction = (event) => {
+      // Suppress action toast popups if Presentation Mode is active
+      if (getPresentationMode()) return;
+
       const data = event.detail || {};
       const rec = data.execution_record || data.execution_result || data;
       const pol = data.policy_decision || {};
@@ -118,7 +135,7 @@ const ActionTakenToast = () => {
     };
   }, []);
 
-  if (!activeAction) return null;
+  if (isPresentationMode || !activeAction) return null;
 
   return (
     <div className="fixed bottom-6 right-8 z-[110] font-sans select-none animate-in fade-in slide-in-from-bottom-3 duration-200 max-w-md w-full">

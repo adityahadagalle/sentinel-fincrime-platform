@@ -2,15 +2,33 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getRole } from '../roleStore';
 import { maskAccount } from '../utils/maskAccount';
 import { ShieldAlert, AlertTriangle } from 'lucide-react';
+import { usePresentationMode } from '../hooks/usePresentationMode';
+import { getPresentationMode } from '../presentationStore';
 
 const LiveAlertToast = () => {
+  const { isPresentationMode } = usePresentationMode();
   const [activeAlert, setActiveAlert] = useState(null);
   const timerRef = useRef(null);
   const seenAlertsRef = useRef(new Map());
   const activeAlertRef = useRef(null);
 
+  // Clear active alert immediately if Presentation Mode is activated
+  useEffect(() => {
+    if (isPresentationMode) {
+      setActiveAlert(null);
+      activeAlertRef.current = null;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [isPresentationMode]);
+
   useEffect(() => {
     const handleAlert = (event) => {
+      // Suppress pop-up visual display if Presentation Mode is active
+      if (getPresentationMode()) return;
+
       const data = event.detail || {};
       const score = Number(data.risk_score || 0);
 
@@ -103,7 +121,7 @@ const LiveAlertToast = () => {
     };
   }, []);
 
-  if (!activeAlert) return null;
+  if (isPresentationMode || !activeAlert) return null;
 
   return (
     <div className="fixed top-5 right-8 z-[100] pointer-events-none font-sans select-none animate-in fade-in slide-in-from-top-2 duration-200">

@@ -12,7 +12,10 @@ model = None
 feature_names = ["amount", "hour", "is_new_receiver", "velocity", "chain_depth", "call_flag"]
 
 
-def predict_ml_score(rule_score: float) -> float:
+from typing import Optional, Any
+
+
+def predict_ml_score(rule_score: float, seed: Optional[Any] = None) -> float:
     """
     Rule-Guided ML Emulator.
 
@@ -22,17 +25,23 @@ def predict_ml_score(rule_score: float) -> float:
       - MID   (>=50): +/- 10  (uncertain zone, moderate noise)
       - LOW   (< 50): +/- 15  (exploratory zone, higher noise)
 
+    When seed is provided (e.g., Benchmark Lab runs or reproducible testing),
+    uses a deterministic pseudo-random generator so identical input features
+    yield identical, reproducible scores across evaluations.
+    When seed is None, uses standard randomness for continuous background simulation.
+
     This guarantees:
       * Pearson r > 0.95 against the rule score
       * Realistic, non-identical outputs per transaction
       * Stable, clamped output in [0, 100]
     """
+    rng = random.Random(seed) if seed is not None else random
     if rule_score >= 80:
-        noise = random.uniform(-5, 5)
+        noise = rng.uniform(-5, 5)
     elif rule_score >= 50:
-        noise = random.uniform(-10, 10)
+        noise = rng.uniform(-10, 10)
     else:
-        noise = random.uniform(-15, 15)
+        noise = rng.uniform(-15, 15)
 
     ml_score = rule_score + noise
     return max(0.0, min(100.0, ml_score))

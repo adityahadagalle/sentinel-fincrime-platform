@@ -1,3 +1,4 @@
+import copy
 import random
 from app.engines.scoring_engine import score_transaction
 from app.engines.case_manager import process_scored_tx
@@ -6,19 +7,27 @@ from app.engines.recovery_engine import recalculate
 from app.services.reasoning_engine import generate_reasoning
 from app.services.ml_risk_engine import predict_ml_score, feature_names
 
-def run_pipeline(tx: dict, store: dict) -> dict:
+def run_pipeline(tx: dict, store: dict, read_only: bool = False) -> dict:
     """
     Main integration pipeline processing a single transaction
     through all core SENTINEL engines sequentially.
+    
+    When read_only is True (or for benchmark sources), state mutations to
+    accounts, cases, graphs, transactions, and action executions are prevented.
     """
+    is_read_only = bool(
+        read_only
+        or tx.get("benchmark_run_id")
+        or tx.get("source") in ("BENCHMARK_LAB", "MANUAL_CUSTOM_INPUT")
+    )
     
     # FIX 4: Safe Graph Initialization
-    if "graphs" not in store:
+    if "graphs" not in store and not is_read_only:
         store["graphs"] = {}
         
     # FIX 3: Safe Account Fallback & Persistence
     sender_id = tx.get("sender_account")
-    if "accounts" not in store:
+    if "accounts" not in store and not is_read_only:
         store["accounts"] = {}
     
     def _determine_kyc_status(acc_id: str, default: str = "PENDING") -> str:
@@ -33,21 +42,32 @@ def run_pipeline(tx: dict, store: dict) -> dict:
             return "PENDING"
         return default
 
-    account = store["accounts"].get(sender_id)
-    if not account:
+    existing_account = store.get("accounts", {}).get(sender_id)
+    if not existing_account:
+        # Determine if is_new_receiver is specified in tx or simulator_meta
+        sim_meta_new = tx.get("simulator_meta", {}).get("is_new_receiver")
+        is_new_val = bool(sim_meta_new) if sim_meta_new is not None else bool(tx.get("is_new_receiver", True))
         account = {
             "account_id": sender_id,
-            "avg_monthly_tx_amount": round(random.uniform(10000, 50000), 2),
-            "current_balance_sim": round(random.uniform(50000, 250000), 2),
+            "avg_monthly_tx_amount": float(tx.get("avg_monthly_tx_amount", 25000.0)),
+            "current_balance_sim": 150000.0,
             "status": "active",
             "kyc_status": _determine_kyc_status(sender_id, "PENDING"),
-            "is_new_receiver": True # First time seen
+            "is_new_receiver": is_new_val,
         }
-        store["accounts"][sender_id] = account
+        if not is_read_only:
+            store.setdefault("accounts", {})[sender_id] = account
     else:
+        account = copy.deepcopy(existing_account) if is_read_only else existing_account
         if "kyc_status" not in account:
             account["kyc_status"] = _determine_kyc_status(sender_id, "PENDING")
-        account["is_new_receiver"] = False
+        # Preserve is_new_receiver if explicitly given in simulator_meta or tx
+        if "simulator_meta" in tx and "is_new_receiver" in tx["simulator_meta"]:
+            account["is_new_receiver"] = bool(tx["simulator_meta"]["is_new_receiver"])
+        elif "is_new_receiver" in tx:
+            account["is_new_receiver"] = bool(tx["is_new_receiver"])
+        elif not is_read_only and "is_new_receiver" not in account:
+            account["is_new_receiver"] = False
         
     # 1b. Try to find an existing active case to inherit origin_score
     case_id = tx.get("case_id")
@@ -77,7 +97,11 @@ def run_pipeline(tx: dict, store: dict) -> dict:
 
     try:
         # 4. Rule-Guided ML Emulator — predict from rule_score directly
-        ml_score = predict_ml_score(float(rule_score))
+        seed = tx.get("benchmark_seed")
+        if not seed and (tx.get("benchmark_run_id") or tx.get("source") in ("BENCHMARK_LAB", "MANUAL_CUSTOM_INPUT")):
+            seed = f"{tx.get('benchmark_run_id', 'BM')}:{tx.get('tx_id', '')}"
+
+        ml_score = predict_ml_score(float(rule_score), seed=seed)
         print(f"  [DEBUG] Rule: {rule_score}, ML: {round(ml_score, 1)}")
 
         # 5. Hybrid Fusion: 60% ML + 40% Rule (high correlation guaranteed)
@@ -158,7 +182,8 @@ def run_pipeline(tx: dict, store: dict) -> dict:
         importance = {k: round(v / total_raw, 4) for k, v in raw.items()}
     else:
         import random as _rnd
-        importance = {fn: round(1/len(feature_names) + _rnd.uniform(-0.02, 0.02), 4)
+        rnd_gen = _rnd.Random(seed) if seed is not None else _rnd
+        importance = {fn: round(1/len(feature_names) + rnd_gen.uniform(-0.02, 0.02), 4)
                       for fn in feature_names}
 
     score_output["ml_feature_importance"] = dict(
@@ -196,69 +221,72 @@ def run_pipeline(tx: dict, store: dict) -> dict:
     tx["ml_feature_importance"] = score_output.get("ml_feature_importance", {})
 
 
-    # 4. Call case_manager
-    case = process_scored_tx(tx, score_output, store)
-    
-    # FIX 1: ORIGIN SCORE PERSISTENCE (Moved after process_scored_tx)
-    if tx.get("hop_number", 0) == 0:
-        tx["origin_score"] = tx.get("risk_score", 0)
-        if case:
-            case["origin_score"] = tx.get("risk_score", 0)
-    
+    # 4. Call case_manager (only in live mode)
+    case = None
     graph = None
     recovery = None
 
-    # 5. GRAPH ENGINE (IMPORTANT)
-    # Only triggered if a case was created or escalated
-    if case:
-        case_id = case["case_id"]
+    if not is_read_only:
+        case = process_scored_tx(tx, score_output, store)
         
-        # FIX 2: RECEIVER FALLBACK (RECOVERY FIX)
-        receiver_id = tx.get("receiver_account")
-        receiver_account = store.get("accounts", {}).get(receiver_id)
-        if not receiver_account:
-            amount = float(tx.get("amount", 0.0))
-            receiver_account = {
-                "account_id": receiver_id,
-                # Initialization: Start with enough balance to cover the fraud inflow
-                "current_balance_sim": round(amount * random.uniform(0.9, 1.1), 2),
-                "status": "withdrawn" if (receiver_id and receiver_id.startswith("ACC-EXIT")) else "active",
-                "kyc_status": _determine_kyc_status(receiver_id, "PENDING")
-            }
-            if receiver_id:
-                store.setdefault("accounts", {})[receiver_id] = receiver_account
-        elif "kyc_status" not in receiver_account:
-            receiver_account["kyc_status"] = _determine_kyc_status(receiver_id, "PENDING")
+        # FIX 1: ORIGIN SCORE PERSISTENCE (Moved after process_scored_tx)
+        if tx.get("hop_number", 0) == 0:
+            tx["origin_score"] = tx.get("risk_score", 0)
+            if case:
+                case["origin_score"] = tx.get("risk_score", 0)
+        
+        # 5. GRAPH ENGINE (IMPORTANT)
+        # Only triggered if a case was created or escalated
+        if case:
+            case_id = case["case_id"]
             
-        # Add Nodes to Graph
-        add_node(case_id, account, store)
-        add_node(case_id, receiver_account, store)
-        
-        # Add Edge representing the transaction flow
-        amount = float(tx.get("amount", 0.0))
-        extra_meta = {
-            "hop_number": tx.get("hop_number", 1),
-            "total_hops": tx.get("total_hops", 1),
-            "chain_id": tx.get("chain_id"),
-            "pattern_type": tx.get("pattern_type"),
-            "parent_transaction_id": tx.get("parent_transaction_id"),
-            "root_transaction_id": tx.get("root_transaction_id"),
-            "timestamp": tx.get("timestamp", "")
-        }
-        add_edge(case_id, sender_id, receiver_id, tx.get("tx_id"), amount, store, extra=extra_meta)
+            # FIX 2: RECEIVER FALLBACK (RECOVERY FIX)
+            receiver_id = tx.get("receiver_account")
+            receiver_account = store.get("accounts", {}).get(receiver_id)
+            if not receiver_account:
+                amount = float(tx.get("amount", 0.0))
+                receiver_account = {
+                    "account_id": receiver_id,
+                    # Initialization: Start with enough balance to cover the fraud inflow
+                    "current_balance_sim": round(amount * random.uniform(0.9, 1.1), 2),
+                    "status": "withdrawn" if (receiver_id and receiver_id.startswith("ACC-EXIT")) else "active",
+                    "kyc_status": _determine_kyc_status(receiver_id, "PENDING")
+                }
+                if receiver_id:
+                    store.setdefault("accounts", {})[receiver_id] = receiver_account
+            elif "kyc_status" not in receiver_account:
+                receiver_account["kyc_status"] = _determine_kyc_status(receiver_id, "PENDING")
+                
+            # Add Nodes to Graph
+            add_node(case_id, account, store)
+            add_node(case_id, receiver_account, store)
+            
+            # Add Edge representing the transaction flow
+            amount = float(tx.get("amount", 0.0))
+            extra_meta = {
+                "hop_number": tx.get("hop_number", 1),
+                "total_hops": tx.get("total_hops", 1),
+                "chain_id": tx.get("chain_id"),
+                "pattern_type": tx.get("pattern_type"),
+                "parent_transaction_id": tx.get("parent_transaction_id"),
+                "root_transaction_id": tx.get("root_transaction_id"),
+                "timestamp": tx.get("timestamp", "")
+            }
+            add_edge(case_id, sender_id, receiver_id, tx.get("tx_id"), amount, store, extra=extra_meta)
 
-        
-        # Fetch finalized graph
-        graph = get_graph(case_id, store)
-        
-        # 6. Call recovery_engine
-        recovery = recalculate(case_id, store)
+            # Fetch finalized graph
+            graph = get_graph(case_id, store)
+            
+            # 6. Call recovery_engine
+            recovery = recalculate(case_id, store)
+    else:
+        # In read-only / benchmark mode, keep origin score without modifying store
+        if tx.get("hop_number", 0) == 0 and "origin_score" not in tx:
+            tx["origin_score"] = tx.get("risk_score", 0)
 
     # 7. Evaluate Automated Response Policy & Phase 16 Autonomous Action Executor
     automate_mode = bool(store.get("automation_mode", False))
     from app.engines.autonomous_policy_engine import evaluate_autonomous_policy
-    from app.services.simulated_action_executor import execute_simulated_action
-    import asyncio
 
     policy_decision = evaluate_autonomous_policy(
         tx=tx,
@@ -266,33 +294,48 @@ def run_pipeline(tx: dict, store: dict) -> dict:
         automate_mode=automate_mode
     )
 
-    try:
-        execution_record = asyncio.run(
-            execute_simulated_action(
-                case_id=case.get("case_id") if case else tx.get("case_id"),
-                tx_id=tx.get("tx_id"),
-                action_code=policy_decision.get("action", "MONITOR"),
-                policy_decision=policy_decision,
-                actor_type="AUTOMATION_ENGINE"
-            )
-        )
-    except Exception:
+    if is_read_only:
+        requires_operator = (policy_decision.get("action") == "FREEZE")
         execution_record = {
-            "execution_status": "SUCCESS" if (automate_mode and policy_decision.get("action") != "FREEZE") else "NOT_EXECUTED" if not automate_mode else "REQUIRES_OPERATOR_ACTION",
-            "actor_type": "AUTOMATION_ENGINE" if (automate_mode and policy_decision.get("action") != "FREEZE") else "HUMAN_OPERATOR",
+            "execution_status": "REQUIRES_OPERATOR_ACTION" if requires_operator else "SIMULATED_SUCCESS",
+            "actor_type": "HUMAN_OPERATOR" if requires_operator else "AUTOMATION_ENGINE",
             "action_code": policy_decision.get("action", "MONITOR"),
-            "automation_mode": "AUTOMATE_ON" if automate_mode else "AUTOMATE_OFF"
+            "policy_decision": policy_decision,
+            "simulated": True,
+            "boundary_enforced": True,
         }
+    else:
+        from app.services.simulated_action_executor import execute_simulated_action
+        import asyncio
+
+        try:
+            execution_record = asyncio.run(
+                execute_simulated_action(
+                    case_id=case.get("case_id") if case else tx.get("case_id"),
+                    tx_id=tx.get("tx_id"),
+                    action_code=policy_decision.get("action", "MONITOR"),
+                    policy_decision=policy_decision,
+                    actor_type="AUTOMATION_ENGINE"
+                )
+            )
+        except Exception:
+            execution_record = {
+                "execution_status": "SUCCESS" if (automate_mode and policy_decision.get("action") != "FREEZE") else "NOT_EXECUTED" if not automate_mode else "REQUIRES_OPERATOR_ACTION",
+                "actor_type": "AUTOMATION_ENGINE" if (automate_mode and policy_decision.get("action") != "FREEZE") else "HUMAN_OPERATOR",
+                "action_code": policy_decision.get("action", "MONITOR"),
+                "automation_mode": "AUTOMATE_ON" if automate_mode else "AUTOMATE_OFF"
+            }
 
     tx["execution_record"] = execution_record
     tx["response_decision"] = policy_decision
 
-    # 8. Store transaction globally
-    tx_id = tx.get("tx_id")
-    if tx_id:
-        if "transactions" not in store:
-            store["transactions"] = {}
-        store["transactions"][tx_id] = tx
+    # 8. Store transaction globally (only in live mode)
+    if not is_read_only:
+        tx_id = tx.get("tx_id")
+        if tx_id:
+            if "transactions" not in store:
+                store["transactions"] = {}
+            store["transactions"][tx_id] = tx
 
     # Final formatted output
     return {
