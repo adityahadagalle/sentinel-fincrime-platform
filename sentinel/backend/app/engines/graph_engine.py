@@ -281,8 +281,12 @@ def classify_topology_archetype(graph: dict) -> str:
 
 def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAULT_GRAPH_HOPS, focus_tx_id: Optional[str] = None) -> dict:
     """
-    Dynamically builds the complete connected multi-hop investigation graph for a case or focused transaction.
-    Preserves real transaction graph relationships and provides contextual topology.
+    Dynamically builds the authentic transaction network graph for a focused transaction or case.
+    Strictly data-driven:
+    - 2-node direct transfer -> 2 nodes, 1 edge
+    - Multi-hop chain -> all real intermediary mules/accounts in sequence
+    - Branching / split -> real fan-out or fan-in topology
+    Zero synthetic padding, zero fake disconnected nodes.
     """
     if "graphs" not in store:
         store["graphs"] = {}
@@ -291,12 +295,26 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
     case_obj = store.get("cases", {}).get(case_id, {})
     account_store = store.get("accounts", {})
 
-    # If focused on a specific transaction, build a clean, transaction-anchored investigation graph
-    if focus_tx_id and focus_tx_id in store.get("transactions", {}):
-        f_tx = store["transactions"][focus_tx_id]
+    # If focused on a specific transaction, build an authentic transaction-anchored graph
+    if focus_tx_id:
+        f_tx = store.get("transactions", {}).get(focus_tx_id)
+        if not f_tx:
+            for t in all_txs:
+                if t.get("tx_id") == focus_tx_id:
+                    f_tx = t
+                    break
+
+        if not f_tx:
+            return {
+                "nodes": [],
+                "edges": [],
+                "primary_tx_id": focus_tx_id,
+                "case_id": case_id,
+                "topology_type": "NONE"
+            }
+
         f_snd = f_tx.get("sender_account")
         f_rcv = f_tx.get("receiver_account")
-        f_amt = float(f_tx.get("amount", 0.0))
         f_cid = f_tx.get("chain_id")
         f_rid = f_tx.get("root_transaction_id") or focus_tx_id
         f_case = f_tx.get("case_id") or case_id
@@ -310,11 +328,11 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
             acc_info = account_store.get(acc_id) or {"account_id": acc_id}
             acc_type = acc_info.get("account_type")
             if not acc_type:
-                if acc_id.startswith("ACC-USR") or acc_id.startswith("ACC-VICTIM"):
+                if acc_id.startswith("ACC-USR") or acc_id.startswith("ACC-VICTIM") or acc_id.startswith("ACC-SRC"):
                     acc_type = "SOURCE"
-                elif acc_id.startswith("ACC-MERCH") or acc_id.startswith("CASHOUT") or acc_id.startswith("DESK"):
+                elif acc_id.startswith("ACC-MERCH") or acc_id.startswith("CASHOUT") or acc_id.startswith("DESK") or acc_id.startswith("CRYPTO"):
                     acc_type = "DESTINATION"
-                elif acc_id.startswith("ACC-COL"):
+                elif acc_id.startswith("ACC-COL") or acc_id.startswith("ACC-HUB") or acc_id.startswith("UPI"):
                     acc_type = "INTERMEDIARY"
                 else:
                     acc_type = default_type
@@ -326,6 +344,7 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
                 "status": acc_info.get("status", "active"),
                 "balance": float(acc_info.get("current_balance_sim", 125000.0)),
                 "account_type": acc_type,
+                "node_type": acc_type.lower(),
                 "risk_score": float(acc_info.get("risk_score", 85.0 if acc_type == "MULE" else 20.0))
             }
 
@@ -362,47 +381,74 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
         # 1. Add primary focal transaction
         _add_tx_edge(f_tx, is_primary=True)
 
-        # 2. Gather genuine connected transactions (limit to ~5-8 meaningful entities total)
-        # Upstream feeders into focal sender
-        upstream_txs = [
-            t for t in all_txs
-            if t.get("receiver_account") == f_snd and t.get("tx_id") != focus_tx_id
-        ]
-        upstream_txs.sort(key=lambda x: float(x.get("amount", 0.0)), reverse=True)
-        for u_tx in upstream_txs[:3]:
-            _add_tx_edge(u_tx)
+        # 2. If part of an explicit chain/root network, add all transactions sharing that chain or root
+        if f_cid:
+            chain_txs = [t for t in all_txs if t.get("chain_id") == f_cid]
+            for c_tx in chain_txs:
+                _add_tx_edge(c_tx)
 
-        # Downstream conduits out of focal receiver
-        downstream_txs = [
-            t for t in all_txs
-            if t.get("sender_account") == f_rcv and t.get("tx_id") != focus_tx_id
-        ]
-        downstream_txs.sort(key=lambda x: float(x.get("amount", 0.0)), reverse=True)
-        for d_tx in downstream_txs[:3]:
-            _add_tx_edge(d_tx)
-
-        # Sibling transactions in same case/chain if room permits (< 8 nodes)
-        if len(nodes_by_id) < 6:
-            sibling_txs = [
+        if f_rid:
+            root_txs = [
                 t for t in all_txs
-                if (t.get("case_id") == f_case or (f_cid and t.get("chain_id") == f_cid))
-                and t.get("tx_id") != focus_tx_id
-                and t.get("tx_id") not in edges_by_tx
+                if (t.get("root_transaction_id") == f_rid or t.get("parent_transaction_id") == f_rid)
+                and (not f_case or t.get("case_id") == f_case)
             ]
-            sibling_txs.sort(key=lambda x: float(x.get("amount", 0.0)), reverse=True)
-            for s_tx in sibling_txs:
-                if len(nodes_by_id) >= 7:
-                    break
-                _add_tx_edge(s_tx)
+            for r_tx in root_txs:
+                _add_tx_edge(r_tx)
 
+        # 3. Connected Component BFS Traversal (up to depth_limit hops)
+        depth_limit = min(max(1, max_depth), MAX_GRAPH_HOPS)
+        current_connected_accounts = set(nodes_by_id.keys())
+
+        for _ in range(depth_limit):
+            found_new = False
+            for t in all_txs:
+                tid = t.get("tx_id")
+                if not tid or tid in edges_by_tx:
+                    continue
+                s = str(t.get("sender_account", ""))
+                r = str(t.get("receiver_account", ""))
+                is_touching = (s in current_connected_accounts or r in current_connected_accounts)
+                if not is_touching:
+                    continue
+
+                case_match = (f_case and t.get("case_id") == f_case)
+                chain_match = (f_cid and t.get("chain_id") == f_cid)
+                # Check root or parent linkage bidirectionally
+                link_match = bool(
+                    (t.get("parent_transaction_id") in edges_by_tx) or 
+                    (t.get("root_transaction_id") and t.get("root_transaction_id") == f_rid) or
+                    (any(e.get("parent_transaction_id") == tid for e in edges_by_tx.values()))
+                )
+
+                if case_match or chain_match or link_match:
+                    _add_tx_edge(t)
+                    if s:
+                        current_connected_accounts.add(s)
+                    if r:
+                        current_connected_accounts.add(r)
+                    found_new = True
+
+            if not found_new:
+                break
+
+        # Strictly authentic data: no disconnected sibling stuffing!
         final_edges = list(edges_by_tx.values())
+        final_edges.sort(key=lambda e: (e.get("hop_number", 1), e.get("timestamp", "")))
+
         active_node_ids = set()
         for e in final_edges:
             active_node_ids.add(e.get("from"))
             active_node_ids.add(e.get("to"))
 
         final_nodes = [n for n in nodes_by_id.values() if (n.get("account_id") or n.get("id")) in active_node_ids]
-        graph = {"nodes": final_nodes, "edges": final_edges, "primary_tx_id": focus_tx_id, "case_id": f_case}
+        graph = {
+            "nodes": final_nodes,
+            "edges": final_edges,
+            "primary_tx_id": focus_tx_id,
+            "case_id": f_case,
+            "chain_id": f_cid
+        }
         _recalculate_node_stats(graph)
         graph["topology_type"] = classify_topology_archetype(graph)
         return graph

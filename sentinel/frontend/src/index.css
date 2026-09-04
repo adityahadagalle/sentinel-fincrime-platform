@@ -67,3 +67,32 @@
   animation: newRowEntry 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Real Risk Score Trend Live Telemetry Pulse */
+@keyframes riskTelemetryPulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  60% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.risk-telemetry-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: riskTelemetryPulse 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .risk-telemetry-pulse {
+    animation: none !important;
+    display: none !important;
+  }
+}
+

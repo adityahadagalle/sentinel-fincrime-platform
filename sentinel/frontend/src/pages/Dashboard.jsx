@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { 
   Shield, Activity, ShieldAlert, TrendingUp, CheckCircle2, Zap, 
@@ -149,6 +149,379 @@ const RiskDistributionTooltip = ({ active, payload }) => {
     </div>
   );
 };
+
+/**
+ * Enterprise Custom Tooltip for Real Risk Score Trend
+ * Matches SENTINEL dark cyber-intelligence HUD specifications.
+ */
+const CustomRiskTooltip = ({ active, payload }) => {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  const score = Number(data.avg_score ?? 0);
+  const scoreColor = score >= 85 ? 'text-rose-400' : score >= 70 ? 'text-amber-400' : 'text-sky-400';
+  const tierLabel = score >= 85 ? 'CRITICAL RISK' : score >= 70 ? 'ELEVATED RISK' : 'NORMAL RANGE';
+  const tierBg = score >= 85 
+    ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' 
+    : score >= 70 
+    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
+    : 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+
+  return (
+    <div className="bg-[#081020]/95 border border-[#1E293B] rounded-lg p-3 shadow-[0_8px_32px_rgba(0,0,0,0.8)] backdrop-blur-md font-mono text-[11px] min-w-[185px] select-none pointer-events-none transition-all duration-150 animate-fade-in">
+      <div className="flex items-center justify-between gap-3 pb-2 border-b border-[#1E293B]">
+        <span className="text-slate-100 font-bold tracking-tight">{data.timestamp}</span>
+        <span className={`text-[8.5px] px-1.5 py-0.5 rounded border font-bold uppercase tracking-wider ${tierBg}`}>
+          {tierLabel}
+        </span>
+      </div>
+
+      <div className="pt-2 space-y-1.5">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-slate-400">Average Score :</span>
+          <span className={`font-bold ${scoreColor}`}>{score.toFixed(1)}</span>
+        </div>
+
+        {data.high_risk !== undefined && (
+          <div className="flex items-center justify-between text-[9.5px] text-slate-400">
+            <span>High Risk (70-84):</span>
+            <span className="text-amber-400 font-semibold">{data.high_risk}</span>
+          </div>
+        )}
+
+        {data.critical_risk !== undefined && (
+          <div className="flex items-center justify-between text-[9.5px] text-slate-400">
+            <span>Critical (≥85):</span>
+            <span className="text-rose-400 font-semibold">{data.critical_risk}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * RealRiskScoreTrendChart
+ * Professional, enterprise-grade animated time-series visualization for transaction risk telemetry.
+ */
+const RealRiskScoreTrendChart = React.memo(({ riskTrend = [], avgRiskScore = 0, critCount = 0 }) => {
+  // 13. Check prefers-reduced-motion accessibility
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+
+    const handler = (e) => setPrefersReducedMotion(e.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, []);
+
+  // 1. & 8. Initial Left-to-Right Progressive Draw State (800-1200ms)
+  const [revealPercent, setRevealPercent] = useState(prefersReducedMotion ? 100 : 0);
+  const [fillFade, setFillFade] = useState(prefersReducedMotion ? 1 : 0);
+  const hasInitiallyDrawnRef = useRef(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion || hasInitiallyDrawnRef.current || riskTrend.length === 0) {
+      setRevealPercent(100);
+      setFillFade(1);
+      return;
+    }
+
+    const startTime = performance.now();
+    const duration = 1000; // 1000ms duration (within 800-1200ms specification)
+
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Smooth cubic ease-out
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      setRevealPercent(ease * 100);
+      setFillFade(Math.min(progress * 1.2, 1));
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        hasInitiallyDrawnRef.current = true;
+        setRevealPercent(100);
+        setFillFade(1);
+      }
+    };
+
+    const animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [prefersReducedMotion, riskTrend.length > 0]);
+
+  // Latest Trend Point
+  const latestTrendPoint = useMemo(() => {
+    return riskTrend.length > 0 ? riskTrend[riskTrend.length - 1] : null;
+  }, [riskTrend]);
+
+  // 4. Smooth Value Transition & 10. Micro-Interaction for "Latest Chunk" Badge
+  const [displayScore, setDisplayScore] = useState(latestTrendPoint ? Number(latestTrendPoint.avg_score || 0) : 0);
+  const [isBadgeTransitioning, setIsBadgeTransitioning] = useState(false);
+  const [isSeverityAlert, setIsSeverityAlert] = useState(false);
+  const prevScoreRef = useRef(null);
+  const scoreAnimRef = useRef(null);
+
+  useEffect(() => {
+    if (!latestTrendPoint?.avg_score) return;
+    const targetScore = Number(latestTrendPoint.avg_score);
+
+    if (prevScoreRef.current === null) {
+      prevScoreRef.current = targetScore;
+      setDisplayScore(targetScore);
+      return;
+    }
+
+    const startScore = prevScoreRef.current;
+    if (startScore === targetScore) return;
+
+    // 7. Risk Severity Response: Detect transition into significantly higher-risk range
+    if (targetScore >= 70 && (startScore < 70 || (targetScore - startScore) >= 10)) {
+      setIsSeverityAlert(true);
+      const alertTimer = setTimeout(() => setIsSeverityAlert(false), 1600);
+      return () => clearTimeout(alertTimer);
+    }
+
+    // 10. Micro-interaction: subtle opacity/scale transition for badge (250ms)
+    setIsBadgeTransitioning(true);
+    const badgeTimer = setTimeout(() => setIsBadgeTransitioning(false), 280);
+
+    if (prefersReducedMotion) {
+      setDisplayScore(targetScore);
+      prevScoreRef.current = targetScore;
+      return () => clearTimeout(badgeTimer);
+    }
+
+    // Smooth value interpolation over 400ms
+    const startTime = performance.now();
+    const duration = 400;
+
+    const interpolate = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = startScore + (targetScore - startScore) * ease;
+      setDisplayScore(Number(current.toFixed(1)));
+
+      if (progress < 1) {
+        scoreAnimRef.current = requestAnimationFrame(interpolate);
+      } else {
+        prevScoreRef.current = targetScore;
+      }
+    };
+
+    scoreAnimRef.current = requestAnimationFrame(interpolate);
+
+    return () => {
+      cancelAnimationFrame(scoreAnimRef.current);
+      clearTimeout(badgeTimer);
+    };
+  }, [latestTrendPoint?.avg_score, prefersReducedMotion]);
+
+  // 3. Latest Data Point Dot Renderer: Subtle Pulse / Live Telemetry
+  const renderCustomDot = useCallback((dotProps) => {
+    const { cx, cy, index } = dotProps;
+    const isLatest = index === riskTrend.length - 1;
+
+    // Only the latest point has the live telemetry indicator; all previous remain static
+    if (!isLatest) return null;
+    if (!cx || !cy || isNaN(cx) || isNaN(cy)) return null;
+
+    const score = Number(latestTrendPoint?.avg_score || 0);
+    const isCritical = score >= 85;
+    const isHigh = score >= 70;
+    const accentColor = isSeverityAlert
+      ? '#F43F5E'
+      : isCritical
+      ? '#F43F5E'
+      : isHigh
+      ? '#FB923C'
+      : '#06b6d4';
+
+    return (
+      <g key="latest-live-point" className="pointer-events-none">
+        {/* Subtle Live Telemetry Pulse Ripple (Only on latest point, disabled if reduced motion) */}
+        {!prefersReducedMotion && (
+          <circle
+            cx={cx}
+            cy={cy}
+            r={isSeverityAlert ? 8 : 6}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={1.2}
+            className="risk-telemetry-pulse"
+          />
+        )}
+        {/* Ambient soft glow */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={isSeverityAlert ? 5.5 : 4}
+          fill={accentColor}
+          opacity={isSeverityAlert ? 0.45 : 0.25}
+          style={{ transition: 'all 0.3s ease-out' }}
+        />
+        {/* Solid dark core with telemetry border */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={3}
+          fill="#081020"
+          stroke={accentColor}
+          strokeWidth={1.5}
+        />
+        {/* Center white telemetry ping */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={1.2}
+          fill="#FFFFFF"
+        />
+      </g>
+    );
+  }, [riskTrend.length, latestTrendPoint?.avg_score, isSeverityAlert, prefersReducedMotion]);
+
+  // 5. Nearest Data Point Hover Glow Dot
+  const renderActiveDot = useCallback((activeProps) => {
+    const { cx, cy, payload } = activeProps;
+    if (!cx || !cy || isNaN(cx) || isNaN(cy)) return null;
+    const score = Number(payload?.avg_score || 0);
+    const dotColor = score >= 85 ? '#F43F5E' : score >= 70 ? '#FB923C' : '#38BDF8';
+
+    return (
+      <g key="active-hover-point" className="pointer-events-none">
+        <circle cx={cx} cy={cy} r={8} fill={dotColor} opacity={0.25} />
+        <circle cx={cx} cy={cy} r={4.5} fill="#081020" stroke="#FFFFFF" strokeWidth={2} />
+        <circle cx={cx} cy={cy} r={1.5} fill={dotColor} />
+      </g>
+    );
+  }, []);
+
+  return (
+    <div className="lg:col-span-7 bg-[#0B132B]/90 border border-[#1E293B] p-5 rounded-xl shadow-xl flex flex-col justify-between space-y-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-sky-400" />
+            Real Risk Score Trend
+          </h2>
+          <p className="text-[11px] text-slate-400 font-sans mt-0.5">
+            Chronological progression of transaction risk scores across current dataset
+          </p>
+        </div>
+
+        {latestTrendPoint && (
+          <div className="flex items-center gap-2 text-[10px] font-mono">
+            <span 
+              className={`px-2 py-0.5 rounded border font-bold transition-all duration-300 ${
+                isBadgeTransitioning 
+                  ? 'scale-[1.04] bg-sky-500/20 border-sky-400/50 text-sky-200 shadow-[0_0_12px_rgba(56,189,248,0.25)]' 
+                  : isSeverityAlert
+                  ? 'scale-[1.02] bg-rose-500/20 border-rose-500/40 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.25)]'
+                  : 'bg-sky-500/10 border-sky-500/30 text-sky-300'
+              }`}
+            >
+              Latest Chunk: {displayScore} Avg
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Time Series Area Chart */}
+      <div className="h-[240px] w-full mt-2 relative">
+        {riskTrend.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={riskTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                {/* Gradient with progressive reveal fade-in */}
+                <linearGradient id="riskScoreGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4 * fillFade} />
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                </linearGradient>
+
+                {/* 1. & 8. Progressive Left-to-Right Reveal ClipPath */}
+                <clipPath id="riskTrendRevealClip">
+                  <rect x="0" y="0" width={`${revealPercent}%`} height="100%" />
+                </clipPath>
+              </defs>
+
+              {/* 9. Grid & Axes are completely static — zero animation or layout shift */}
+              <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+              <XAxis 
+                dataKey="timestamp" 
+                stroke="#64748B" 
+                tick={{ fill: '#64748B', fontSize: 10, fontFamily: 'monospace' }} 
+              />
+              <YAxis 
+                domain={[0, 100]} 
+                stroke="#64748B" 
+                tick={{ fill: '#64748B', fontSize: 10, fontFamily: 'monospace' }} 
+              />
+
+              {/* 5. & 6. Snapped Crosshair Guide Line & Follow Tooltip */}
+              <Tooltip 
+                cursor={{
+                  stroke: '#E2E8F0',
+                  strokeWidth: 1,
+                  strokeOpacity: 0.65,
+                  strokeDasharray: 'none'
+                }}
+                content={<CustomRiskTooltip />}
+                isAnimationActive={!prefersReducedMotion}
+                animationDuration={150}
+              />
+
+              {/* 1, 2, 3, 7, 8. Area & Line with Progressive Reveal and Live Telemetry Dot */}
+              <Area 
+                type="monotone" 
+                dataKey="avg_score" 
+                stroke="#06b6d4" 
+                strokeWidth={2} 
+                fillOpacity={1} 
+                fill="url(#riskScoreGrad)" 
+                clipPath="url(#riskTrendRevealClip)"
+                dot={renderCustomDot}
+                activeDot={renderActiveDot}
+                isAnimationActive={!prefersReducedMotion && hasInitiallyDrawnRef.current}
+                animationDuration={400}
+                animationEasing="ease-out"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-full flex items-center justify-center text-slate-500 font-mono text-xs">
+            No chronological risk points available in current timeframe
+          </div>
+        )}
+      </div>
+
+      {/* Time-Series Meta Bar */}
+      <div className="pt-3 border-t border-[#1E293B] grid grid-cols-3 gap-2 text-center font-mono text-[10px]">
+        <div className="p-2 rounded bg-[#060B15] border border-[#1E293B]/60">
+          <span className="text-slate-500 block">TIME POINTS</span>
+          <span className="font-bold text-slate-200">{riskTrend.length} intervals</span>
+        </div>
+        <div className="p-2 rounded bg-[#060B15] border border-[#1E293B]/60">
+          <span className="text-slate-500 block">SYSTEM AVERAGE</span>
+          <span className="font-bold text-sky-400">{avgRiskScore}</span>
+        </div>
+        <div className="p-2 rounded bg-[#060B15] border border-[#1E293B]/60">
+          <span className="text-slate-500 block">CRITICAL SPIKES</span>
+          <span className="font-bold text-rose-400">{critCount}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 /**
  * Polished, 60fps Interactive Risk Distribution Explorer
@@ -1098,99 +1471,12 @@ const Dashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           
-          {/* Left: Risk Score Time Series (7 cols) */}
-          <div className="lg:col-span-7 bg-[#0B132B]/90 border border-[#1E293B] p-5 rounded-xl shadow-xl flex flex-col justify-between space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-sky-400" />
-                  Real Risk Score Trend
-                </h2>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                  Chronological progression of transaction risk scores across current dataset
-                </p>
-              </div>
-
-              {latestTrendPoint && (
-                <div className="flex items-center gap-2 text-[10px] font-mono">
-                  <span className="px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/30 text-sky-300 font-bold">
-                    Latest Chunk: {latestTrendPoint.avg_score} Avg
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Time Series Area Chart */}
-            <div className="h-[240px] w-full mt-2">
-              {riskTrend.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={riskTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="riskScoreGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      stroke="#64748B" 
-                      tick={{ fill: '#64748B', fontSize: 10, fontFamily: 'monospace' }} 
-                    />
-                    <YAxis 
-                      domain={[0, 100]} 
-                      stroke="#64748B" 
-                      tick={{ fill: '#64748B', fontSize: 10, fontFamily: 'monospace' }} 
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#081020', 
-                        borderColor: '#1E293B', 
-                        borderRadius: '8px', 
-                        fontFamily: 'monospace',
-                        fontSize: '11px',
-                        color: '#E2E8F0' 
-                      }}
-                      formatter={(val, name) => {
-                        if (name === 'avg_score') return [val, 'Average Score'];
-                        if (name === 'high_risk') return [val, 'High Risk Count (70-84)'];
-                        if (name === 'critical_risk') return [val, 'Critical Count (≥85)'];
-                        return [val, name];
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="avg_score" 
-                      stroke="#06b6d4" 
-                      strokeWidth={2} 
-                      fillOpacity={1} 
-                      fill="url(#riskScoreGrad)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-500 font-mono text-xs">
-                  No chronological risk points available in current timeframe
-                </div>
-              )}
-            </div>
-
-            {/* Time-Series Meta Bar */}
-            <div className="pt-3 border-t border-[#1E293B] grid grid-cols-3 gap-2 text-center font-mono text-[10px]">
-              <div className="p-2 rounded bg-[#060B15] border border-[#1E293B]/60">
-                <span className="text-slate-500 block">TIME POINTS</span>
-                <span className="font-bold text-slate-200">{riskTrend.length} intervals</span>
-              </div>
-              <div className="p-2 rounded bg-[#060B15] border border-[#1E293B]/60">
-                <span className="text-slate-500 block">SYSTEM AVERAGE</span>
-                <span className="font-bold text-sky-400">{avgRiskScore}</span>
-              </div>
-              <div className="p-2 rounded bg-[#060B15] border border-[#1E293B]/60">
-                <span className="text-slate-500 block">CRITICAL SPIKES</span>
-                <span className="font-bold text-rose-400">{critCount}</span>
-              </div>
-            </div>
-          </div>
+          {/* Left: Risk Score Time Series (7 cols) - Enterprise Animated Visualization */}
+          <RealRiskScoreTrendChart 
+            riskTrend={riskTrend} 
+            avgRiskScore={avgRiskScore} 
+            critCount={critCount} 
+          />
 
           {/* Right: Risk Level Distribution Explorer (5 cols) */}
           <RiskDistributionExplorer

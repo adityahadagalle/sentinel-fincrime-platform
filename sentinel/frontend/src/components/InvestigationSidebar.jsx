@@ -134,87 +134,75 @@ const InvestigationSidebar = ({
 
     // D. Fetch or derive Graph Topology for Cytoscape
     setGraphLoading(true);
-    if (selectedCase?.nodes && selectedCase.nodes.length > 0) {
-      setGraphData({
-        nodes: selectedCase.nodes,
-        edges: selectedCase.edges || []
-      });
-      setGraphLoading(false);
-    } else {
-      fetch(`${API_BASE}/cases/${caseId}/graph`)
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.nodes && data.nodes.length > 0) {
-            setGraphData({ nodes: data.nodes, edges: data.edges || [] });
-          } else {
-            // Fallback synthetic graph derived from transaction context
-            const synthNodes = [
-              {
-                id: sender,
-                accountId: sender,
-                account_id: sender,
-                account_type: 'SOURCE',
-                type: 'victim',
-                status: 'active',
-                balance: totalAmount * 1.5,
-                risk_score: 15
-              },
-              {
-                id: receiver,
-                accountId: receiver,
-                account_id: receiver,
-                account_type: 'MULE',
-                type: 'mule',
-                status: isAccountFrozen ? 'FROZEN' : 'flagged',
-                balance: totalAmount,
-                risk_score: riskScore
-              },
-              {
-                id: 'ACC-MULE-9021',
-                accountId: 'ACC-MULE-9021',
-                account_id: 'ACC-MULE-9021',
-                account_type: 'MULE',
-                type: 'mule',
-                status: 'flagged',
-                balance: Math.round(totalAmount * 0.7),
-                risk_score: 78
-              },
-              {
-                id: 'ACC-EXIT-1102',
-                accountId: 'ACC-EXIT-1102',
-                account_id: 'ACC-EXIT-1102',
-                account_type: 'DESTINATION',
-                type: 'cashout',
-                status: 'critical',
-                balance: Math.round(totalAmount * 0.5),
-                risk_score: 92
-              }
-            ];
-            const synthEdges = [
-              { id: `e1-${txId}`, source: sender, target: receiver, amount: totalAmount, channel, is_suspicious: true },
-              { id: `e2-${txId}`, source: receiver, target: 'ACC-MULE-9021', amount: Math.round(totalAmount * 0.7), channel: 'IMPS', is_suspicious: true },
-              { id: `e3-${txId}`, source: 'ACC-MULE-9021', target: 'ACC-EXIT-1102', amount: Math.round(totalAmount * 0.5), channel: 'ATM_CASH', is_suspicious: true }
-            ];
-            setGraphData({ nodes: synthNodes, edges: synthEdges });
+    const activeTargetTxId = selectedTransaction?.tx_id || selectedCase?.primary_tx_id;
+    const fetchGraph = async () => {
+      try {
+        if (activeTargetTxId) {
+          const txRes = await fetch(`${API_BASE}/transactions/${activeTargetTxId}/graph`);
+          if (txRes.ok) {
+            const txData = await txRes.json();
+            if (txData?.nodes && txData.nodes.length > 0) {
+              setGraphData({ nodes: txData.nodes, edges: txData.edges || [], topology_type: txData.topology_type });
+              setGraphLoading(false);
+              return;
+            }
           }
-        })
-        .catch(() => {
-          // Minimal 2-node graph
+        }
+
+        // Fallback to case graph
+        if (caseId) {
+          const caseRes = await fetch(`${API_BASE}/cases/${caseId}/graph${activeTargetTxId ? `?tx_id=${activeTargetTxId}` : ''}`);
+          if (caseRes.ok) {
+            const caseData = await caseRes.json();
+            if (caseData?.nodes && caseData.nodes.length > 0) {
+              setGraphData({ nodes: caseData.nodes, edges: caseData.edges || [], topology_type: caseData.topology_type });
+              setGraphLoading(false);
+              return;
+            }
+          }
+        }
+
+        // If no graph exists from API, fallback strictly to the genuine 2-node direct transfer
+        if (selectedTransaction?.sender_account && selectedTransaction?.receiver_account) {
+          const s = selectedTransaction.sender_account;
+          const r = selectedTransaction.receiver_account;
           setGraphData({
             nodes: [
-              { id: sender, accountId: sender, type: 'victim', status: 'active', risk_score: 15 },
-              { id: receiver, accountId: receiver, type: 'mule', status: isAccountFrozen ? 'FROZEN' : 'flagged', risk_score: riskScore }
+              { id: s, accountId: s, account_id: s, account_type: 'SOURCE', type: 'victim', status: 'active', balance: totalAmount * 1.5, risk_score: 15 },
+              { id: r, accountId: r, account_id: r, account_type: 'DESTINATION', type: 'mule', status: isAccountFrozen ? 'FROZEN' : 'flagged', balance: totalAmount, risk_score: riskScore }
             ],
             edges: [
-              { id: `e-${txId}`, source: sender, target: receiver, amount: totalAmount, channel, is_suspicious: true }
-            ]
+              { id: `e-${txId}`, tx_id: txId, source: s, target: r, from: s, to: r, amount: totalAmount, channel, is_suspicious: riskScore >= 60 }
+            ],
+            topology_type: 'DIRECT_TRANSFER'
           });
-        })
-        .finally(() => setGraphLoading(false));
-    }
+        } else {
+          setGraphData({ nodes: [], edges: [] });
+        }
+      } catch (_) {
+        if (selectedTransaction?.sender_account && selectedTransaction?.receiver_account) {
+          const s = selectedTransaction.sender_account;
+          const r = selectedTransaction.receiver_account;
+          setGraphData({
+            nodes: [
+              { id: s, accountId: s, account_id: s, account_type: 'SOURCE', type: 'victim', status: 'active', risk_score: 15 },
+              { id: r, accountId: r, account_id: r, account_type: 'DESTINATION', type: 'mule', status: isAccountFrozen ? 'FROZEN' : 'flagged', risk_score: riskScore }
+            ],
+            edges: [
+              { id: `e-${txId}`, tx_id: txId, source: s, target: r, from: s, to: r, amount: totalAmount, channel, is_suspicious: riskScore >= 60 }
+            ],
+            topology_type: 'DIRECT_TRANSFER'
+          });
+        }
+      } finally {
+        setGraphLoading(false);
+      }
+    };
+
+    fetchGraph();
 
     return () => clearInterval(interval);
-  }, [isOpen, caseId]);
+  }, [isOpen, caseId, selectedTransaction?.tx_id, selectedCase?.primary_tx_id]);
 
   // ── 2. Run Qwen 3:8B Advisory Analysis (Isolated) ────────────────────────
   const handleRunQwen = async () => {

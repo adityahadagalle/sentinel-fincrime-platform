@@ -79,23 +79,24 @@ const Graph = () => {
     const base = fetchedCase || selectedCase;
 
     // If a specific transaction was requested
-    if (txFromUrl && matchedTx) {
+    if (txFromUrl) {
       // 1. If backend returned transaction-anchored graph, prioritize it
       if (fetchedGraph?.nodes && fetchedGraph.nodes.length > 0) {
         return {
-          case_id: caseId || matchedTx.case_id || `CASE-${matchedTx.tx_id.slice(-8)}`,
+          case_id: caseId || matchedTx?.case_id || fetchedGraph.case_id || `CASE-${txFromUrl.slice(-8)}`,
           primary_tx_id: txFromUrl,
-          status: matchedTx.risk_score >= 70 ? 'HIGH_RISK' : 'NEW',
-          risk_level: matchedTx.risk_score,
-          total_fraud_amount: matchedTx.amount,
+          status: (matchedTx?.risk_score || 0) >= 70 ? 'HIGH_RISK' : 'NEW',
+          risk_level: matchedTx?.risk_score || 50,
+          total_fraud_amount: matchedTx?.amount || 0,
           nodes: fetchedGraph.nodes,
           edges: fetchedGraph.edges,
           topology_type: fetchedGraph.topology_type || 'DIRECT_TRANSFER',
-          transactions: [matchedTx]
+          transactions: matchedTx ? [matchedTx] : []
         };
       }
 
-      // 2. Otherwise derive from live related transactions in memory
+      // 2. Otherwise derive from live related transactions in memory if matchedTx is available
+      if (matchedTx) {
       const relatedTxs = (transactions || []).filter(t => 
         t && (
           t.tx_id === matchedTx.tx_id ||
@@ -163,6 +164,7 @@ const Graph = () => {
         edges: edgeList,
         topology_type: edgeList.length === 1 ? 'DIRECT_TRANSFER' : 'LINEAR_CHAIN'
       };
+      }
     }
 
     if (base) {

@@ -1,521 +1,325 @@
-/**
- * SENTINEL Enterprise Forensic Investigation Graph Stylesheet
- * 
- * Recreated to match the exact visual language of the reference SENTINEL graph:
- *  - Dark forensic cyber-intelligence canvas (#060B14)
- *  - High-precision geometric entities:
- *      * Victim Account: circular node, blue fill, electric blue border, small person glyph (14px)
- *      * Collector / Aggregator Hub: rounded-square, warm amber fill, bright orange border, layered stack glyph
- *      * Police / Investigation Desk: cyan hexagonal node, dashed cyan border, currency crosshair glyph
- *      * Mule Account: red threat styling with alert warning glyph
- *      * Merchant Outlet: green geometric node with storefront glyph
- *      * UPI Handle: purple diamond with lightning glyph
- *      * Cashout Terminal: amber rounded-square with ATM/card glyph
- *  - High-contrast dark backdrop labels with thin blue borders
- *  - Directional dashed red/orange threat flows with autorotated currency edge badges (e.g. ₹92,665 · IMPS)
- *  - Electric blue path tracing and subtle ambient glows
- */
+// ── SENTINEL FINANCIAL-CRIME INVESTIGATION DESIGN SYSTEM ─────────────────────────
+// Clean, authoritative, enterprise styling for high-precision fraud investigation graphs.
 
-const makeSvgUri = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
-
-// ── Precise SVG Micro-Glyphs (Small, crisp, 14px visual glyphs inside nodes) ──────
-export const SVG_ICONS = {
-  // 1. Victim / Feeder Account (User / Person glyph in light cyan/blue)
-  victim: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#93C5FD" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-    </svg>
-  `),
-  // 2. Collector / Aggregator Hub (Layered Stack glyph in bright orange)
-  collector: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#FB923C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-    </svg>
-  `),
-  // 3. Police / Investigation Desk / Cashout (Currency / Crosshair in bright cyan)
-  desk: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#22D3EE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-    </svg>
-  `),
-  // 4. Mule / Suspect Account (Red warning shield / alert)
-  mule: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#EF4444" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-    </svg>
-  `),
-  // 5. Merchant Outlet (Storefront glyph in emerald)
-  merchant: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#34D399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-    </svg>
-  `),
-  // 6. UPI Handle (Lightning / Rail glyph in purple)
-  upi: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#C084FC" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-    </svg>
-  `),
-  // 7. Cashout Terminal (Card terminal in amber)
-  cashout: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#FBBF24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-    </svg>
-  `),
-  // 8. Individual / Fallback User
-  individual: makeSvgUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-5 -5 34 34" fill="none" stroke="#94A3B8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="7" r="4"/><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-    </svg>
-  `)
+export const STATUS_STYLES = {
+  active:    { bg: '#0369A1', border: '#38BDF8', icon: '●' },
+  flagged:   { bg: '#B45309', border: '#F59E0B', icon: '⚠' },
+  frozen:    { bg: '#1E293B', border: '#64748B', icon: '🔒' },
+  withdrawn: { bg: '#881337', border: '#F43F5E', icon: '✕' }
 };
 
-// Legacy exports for compatibility
-export const SVG_USER = SVG_ICONS.victim;
-export const SVG_ALERT = SVG_ICONS.mule;
-export const SVG_CARD = SVG_ICONS.cashout;
-export const SVG_STORE = SVG_ICONS.merchant;
-export const SVG_UPI = SVG_ICONS.upi;
-
-const HEXAGON_POINTS = [-0.5,-0.866, 0.5,-0.866, 1,0, 0.5,0.866, -0.5,0.866, -1,0];
-
-export const getNodeClassification = (node) => {
-  if (node.data('is_cluster')) {
-    const ct = String(node.data('cluster_type') || node.data('type') || '').toLowerCase();
-    if (ct.includes('mule')) return 'MULE_CLUSTER';
-    if (ct.includes('cashout') || ct.includes('exit')) return 'CASHOUT_CLUSTER';
-    if (ct.includes('victim') || ct.includes('feed')) return 'VICTIM_POOL';
-    return 'INTERMEDIARY_CLUSTER';
-  }
-
-  const type = String(node.data('type') || node.data('node_type') || node.data('account_type') || '').toLowerCase();
-  const rawId = String(node.data('id') || node.data('accountId') || '').toUpperCase();
-  const status = String(node.data('status') || '').toLowerCase();
-
-  // Match classification
-  if (type === 'victim' || type === 'feeder' || type === 'source' || rawId.includes('FEEDER') || rawId.includes('VICTIM')) return 'VICTIM';
-  if (type === 'collector' || type === 'aggregator' || type === 'hub' || rawId.includes('COLLECTOR') || rawId.includes('AGGREGATOR') || rawId.includes('HUB')) return 'COLLECTOR';
-  if (type === 'desk' || type === 'police' || type === 'crypto' || rawId.includes('DESK') || rawId.includes('POLICE')) return 'DESK';
-  if (type === 'merchant' || rawId.includes('MERCHANT')) return 'MERCHANT';
-  if (type === 'upi' || type === 'upi_handle' || rawId.includes('UPI')) return 'UPI';
-  if (type === 'cashout' || type === 'atm' || type === 'destination' || rawId.includes('CASHOUT') || rawId.includes('ATM')) return 'CASHOUT';
-  if (type === 'mule' || type === 'suspect' || status === 'flagged' || rawId.includes('MULE') || rawId.includes('SUSPECT')) return 'MULE';
-
-  // Degree heuristics fallback
-  const inDeg = Number(node.indegree ? node.indegree() : 0);
-  const outDeg = Number(node.outdegree ? node.outdegree() : 0);
-  if (inDeg > 1 && outDeg >= 1) return 'COLLECTOR';
-  if (inDeg === 0 && outDeg >= 1) return 'VICTIM';
-  if (inDeg >= 1 && outDeg === 0) return 'CASHOUT';
-
-  return 'VICTIM';
+export const TYPE_STYLES = {
+  SOURCE:       { bg: '#0C2340', border: '#38BDF8', badge: 'ORIGIN',   shape: 'ellipse' },
+  MULE:         { bg: '#2A0808', border: '#F87171', badge: 'MULE',     shape: 'octagon' },
+  INTERMEDIARY: { bg: '#221808', border: '#FBBF24', badge: 'HUB',      shape: 'round-rectangle' },
+  DESTINATION:  { bg: '#06251A', border: '#34D399', badge: 'OUTLET',   shape: 'round-rectangle' },
+  SUSPECT:      { bg: '#2A0808', border: '#FB7185', badge: 'SUSPECT',  shape: 'octagon' },
+  VICTIM:       { bg: '#0C2340', border: '#38BDF8', badge: 'VICTIM',   shape: 'ellipse' }
 };
 
-export const isCriticalNode = (node) => {
-  const cls = getNodeClassification(node);
-  const status = String(node.data('status') || '').toLowerCase();
-  return cls === 'MULE' || cls === 'COLLECTOR' || cls === 'MULE_CLUSTER' || status === 'flagged';
+export const NODE_SHAPE_MAP = {
+  victim:     'ellipse',
+  mule:       'octagon',
+  merchant:   'round-rectangle',
+  UPI:        'diamond',
+  cashout:    'pentagon',
+  crypto:     'hexagon',
+  collector:  'round-rectangle',
+  individual: 'ellipse'
 };
 
-export const NODE_CONFIG = {
-  VICTIM: {
-    label: 'Victim Account',
-    shape: 'ellipse',
-    size: 68,
-    bg: '#0A1A3C',
-    innerGlow: '#1D4ED8',
-    border: '#2563EB',
-    borderWidth: 3.0,
-    borderStyle: 'solid',
-    shadowColor: '#3B82F6',
-    shadowBlur: 14,
-    shadowOpacity: 0.5,
-    icon: SVG_ICONS.victim,
-    badgeColor: '#3B82F6'
-  },
-  VICTIM_POOL: {
-    label: 'Feeder Pool',
-    shape: 'ellipse',
-    size: 72,
-    bg: '#0A1A3C',
-    innerGlow: '#1D4ED8',
-    border: '#38BDF8',
-    borderWidth: 3.2,
-    borderStyle: 'dashed',
-    shadowColor: '#38BDF8',
-    shadowBlur: 18,
-    shadowOpacity: 0.65,
-    icon: SVG_ICONS.victim,
-    badgeColor: '#38BDF8'
-  },
-  COLLECTOR: {
-    label: 'Collector / Aggregator',
-    shape: 'round-rectangle',
-    size: 74,
-    bg: '#331604',
-    innerGlow: '#9A3412',
-    border: '#EA580C',
-    borderWidth: 3.2,
-    borderStyle: 'solid',
-    shadowColor: '#F97316',
-    shadowBlur: 20,
-    shadowOpacity: 0.65,
-    icon: SVG_ICONS.collector,
-    badgeColor: '#F97316'
-  },
-  DESK: {
-    label: 'Police / Investigation Desk',
-    shape: 'polygon',
-    polygonPoints: HEXAGON_POINTS,
-    size: 68,
-    bg: '#042833',
-    innerGlow: '#0E7490',
-    border: '#06B6D4',
-    borderWidth: 2.8,
-    borderStyle: 'dashed',
-    shadowColor: '#06B6D4',
-    shadowBlur: 16,
-    shadowOpacity: 0.6,
-    icon: SVG_ICONS.desk,
-    badgeColor: '#06B6D4'
-  },
-  MULE: {
-    label: 'Mule Account',
-    shape: 'round-rectangle',
-    size: 66,
-    bg: '#330808',
-    innerGlow: '#991B1B',
-    border: '#DC2626',
-    borderWidth: 3.0,
-    borderStyle: 'solid',
-    shadowColor: '#EF4444',
-    shadowBlur: 20,
-    shadowOpacity: 0.7,
-    icon: SVG_ICONS.mule,
-    badgeColor: '#EF4444'
-  },
-  MULE_CLUSTER: {
-    label: 'Mule Cluster',
-    shape: 'round-rectangle',
-    size: 72,
-    bg: '#3D0A0A',
-    innerGlow: '#B91C1C',
-    border: '#EF4444',
-    borderWidth: 3.5,
-    borderStyle: 'dashed',
-    shadowColor: '#EF4444',
-    shadowBlur: 24,
-    shadowOpacity: 0.8,
-    icon: SVG_ICONS.mule,
-    badgeColor: '#EF4444'
-  },
-  MERCHANT: {
-    label: 'Merchant Outlet',
-    shape: 'round-rectangle',
-    size: 64,
-    bg: '#03261A',
-    innerGlow: '#047857',
-    border: '#10B981',
-    borderWidth: 2.5,
-    borderStyle: 'solid',
-    shadowColor: '#10B981',
-    shadowBlur: 14,
-    shadowOpacity: 0.5,
-    icon: SVG_ICONS.merchant,
-    badgeColor: '#10B981'
-  },
-  UPI: {
-    label: 'UPI Handle',
-    shape: 'diamond',
-    size: 64,
-    bg: '#220B3D',
-    innerGlow: '#6B21A8',
-    border: '#9333EA',
-    borderWidth: 2.5,
-    borderStyle: 'solid',
-    shadowColor: '#A855F7',
-    shadowBlur: 14,
-    shadowOpacity: 0.5,
-    icon: SVG_ICONS.upi,
-    badgeColor: '#A855F7'
-  },
-  INTERMEDIARY_CLUSTER: {
-    label: 'Intermediaries Cluster',
-    shape: 'diamond',
-    size: 70,
-    bg: '#250D42',
-    innerGlow: '#7E22CE',
-    border: '#C084FC',
-    borderWidth: 3.2,
-    borderStyle: 'dashed',
-    shadowColor: '#C084FC',
-    shadowBlur: 18,
-    shadowOpacity: 0.65,
-    icon: SVG_ICONS.upi,
-    badgeColor: '#C084FC'
-  },
-  CASHOUT: {
-    label: 'Cashout Terminal',
-    shape: 'round-rectangle',
-    size: 66,
-    bg: '#331B03',
-    innerGlow: '#B45309',
-    border: '#F59E0B',
-    borderWidth: 3.0,
-    borderStyle: 'solid',
-    shadowColor: '#F59E0B',
-    shadowBlur: 16,
-    shadowOpacity: 0.6,
-    icon: SVG_ICONS.cashout,
-    badgeColor: '#F59E0B'
-  },
-  CASHOUT_CLUSTER: {
-    label: 'Cashout Terminals Cluster',
-    shape: 'round-rectangle',
-    size: 72,
-    bg: '#3D1E03',
-    innerGlow: '#D97706',
-    border: '#FBBF24',
-    borderWidth: 3.5,
-    borderStyle: 'dashed',
-    shadowColor: '#FBBF24',
-    shadowBlur: 22,
-    shadowOpacity: 0.75,
-    icon: SVG_ICONS.cashout,
-    badgeColor: '#FBBF24'
-  }
+export const NODE_BG_MAP = {
+  victim:     '#0C2340',
+  mule:       '#2A0808',
+  merchant:   '#06251A',
+  UPI:        '#1E1035',
+  cashout:    '#2E0B18',
+  crypto:     '#1E1035',
+  collector:  '#221808',
+  individual: '#0B1E36'
 };
 
-export const getNodeConfig = (node) => {
-  const cls = getNodeClassification(node);
-  return NODE_CONFIG[cls] || NODE_CONFIG.VICTIM;
-};
-
-// ── Node Label Formatting ──────────────────────────────────────────────────
-export const getNodeLabel = (node) => {
-  if (node.data('is_cluster')) {
-    return String(node.data('label') || node.data('displayLabel') || 'CLUSTER');
-  }
-  const raw = String(node.data('displayLabel') || node.data('accountId') || node.data('id') || '');
-  const status = (node.data('status') || '').toLowerCase();
-  const statusGlyph = status === 'frozen' ? ' 🔒' : status === 'withdrawn' ? ' ✕' : '';
-  
-  if (raw.length > 17) {
-    return `${raw.slice(0, 9)}...${raw.slice(-4)}${statusGlyph}`;
-  }
-  return `${raw}${statusGlyph}`;
-};
-
-// ── Edge Label Formatting (₹ Amount · Channel) ─────────────────────────────
-export const getEdgeLabel = (edge) => {
-  const customLabel = edge.data('label');
-  if (customLabel && customLabel.includes('·')) return customLabel;
-  const amt = Number(edge.data('amount') || 0);
-  const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(amt);
-  const channel = edge.data('channel') || 'UPI';
-  const cleanChannel = channel.replace(/_/g, ' ').toUpperCase();
-  return `₹${formatted} · ${cleanChannel}`;
-};
-
-// ── Edge Color by Risk & Flow Type ─────────────────────────────────────────
-export const getEdgeColor = (edge) => {
-  if (edge.data('is_suspicious') || edge.data('suspicious') || edge.hasClass('suspicious-edge')) return '#EF4444';
-  const amt = Number(edge.data('amount') || 0);
-  if (amt >= 80000) return '#EF4444'; // Suspicious threshold
-  if (amt >= 40000) return '#F97316'; // High value flow
-  return '#2563EB';                  // Electric blue normal flow
+export const NODE_BORDER_MAP = {
+  victim:     '#38BDF8',
+  mule:       '#F87171',
+  merchant:   '#34D399',
+  UPI:        '#C084FC',
+  cashout:    '#FB7185',
+  crypto:     '#A78BFA',
+  collector:  '#FBBF24',
+  individual: '#38BDF8'
 };
 
 export const graphStyles = [
-  /* ── Master Node: 3D Radial Sphere + Scaled SVG Micro-Glyph ─────────── */
+  // ── BASE NODE DEFINITION ──────────────────────────────────────────────────
   {
     selector: 'node',
     style: {
-      'label': (n) => getNodeLabel(n),
-      'shape': (n) => {
-        const cfg = getNodeConfig(n);
-        if (cfg.shape === 'polygon') return 'polygon';
-        return cfg.shape || 'ellipse';
+      'shape': (node) => {
+        const ntype = node.data('node_type');
+        if (ntype && NODE_SHAPE_MAP[ntype]) return NODE_SHAPE_MAP[ntype];
+        const atype = node.data('account_type');
+        if (atype && TYPE_STYLES[atype]) return TYPE_STYLES[atype].shape;
+        return 'ellipse';
       },
-      'shape-polygon-points': (n) => {
-        const cfg = getNodeConfig(n);
-        return cfg.polygonPoints || HEXAGON_POINTS;
+      'label': (node) => {
+        const id = node.data('displayLabel') || node.data('accountId') || node.data('id') || '';
+        const ntype = (node.data('node_type') || node.data('account_type') || 'ACCT').toUpperCase();
+        const shortId = String(id).length > 13 ? String(id).slice(0, 11) + '…' : String(id);
+        return `${shortId}\n${ntype}`;
       },
-
-      // 3D Spherical Radial Depth Fill
-      'background-fill': 'radial-gradient',
-      'background-gradient-stop-colors': (n) => {
-        const c = getNodeConfig(n);
-        return `${c.innerGlow} ${c.bg}`;
+      'background-color': (node) => {
+        const status = node.data('status');
+        if (status === 'frozen') return '#1E293B';
+        const ntype = node.data('node_type');
+        if (ntype && NODE_BG_MAP[ntype]) return NODE_BG_MAP[ntype];
+        const atype = node.data('account_type');
+        if (atype && TYPE_STYLES[atype]) return TYPE_STYLES[atype].bg;
+        return '#0C2340';
       },
-      'background-gradient-stop-positions': '0% 100%',
-      'background-color': (n) => getNodeConfig(n).bg,
-      'border-color': (n) => {
-        if ((n.data('status') || '').toLowerCase() === 'frozen') return '#64748B';
-        return getNodeConfig(n).border;
+      'border-width': 2,
+      'border-color': (node) => {
+        const status = node.data('status');
+        if (status === 'frozen') return '#64748B';
+        if (status === 'flagged') return '#F59E0B';
+        const ntype = node.data('node_type');
+        if (ntype && NODE_BORDER_MAP[ntype]) return NODE_BORDER_MAP[ntype];
+        const atype = node.data('account_type');
+        if (atype && TYPE_STYLES[atype]) return TYPE_STYLES[atype].border;
+        return '#38BDF8';
       },
-      'border-width': (n) => {
-        if ((n.data('status') || '').toLowerCase() === 'frozen') return 3.5;
-        return getNodeConfig(n).borderWidth;
-      },
-      'border-style': (n) => getNodeConfig(n).borderStyle || 'solid',
-      'width': (n) => getNodeConfig(n).size,
-      'height': (n) => getNodeConfig(n).size,
-
-      // Scaled SVG Micro-Glyph (small, crisp 14px visual glyph inside node)
-      'background-image': (n) => getNodeConfig(n).icon || SVG_ICONS.victim,
-      'background-fit': 'none',
-      'background-width': '14px',
-      'background-height': '14px',
-      'background-position-x': '50%',
-      'background-position-y': '50%',
-      'background-image-opacity': 0.95,
-
-      // Ambient Threat & Entity Glow
-      'shadow-blur': (n) => getNodeConfig(n).shadowBlur || 14,
-      'shadow-color': (n) => getNodeConfig(n).shadowColor || '#2563EB',
-      'shadow-opacity': (n) => getNodeConfig(n).shadowOpacity || 0.5,
-      'shadow-offset-x': 0,
-      'shadow-offset-y': 0,
-
-      // Node Identifier Pill Label
-      'color': '#F1F5F9',
-      'text-valign': 'bottom',
+      'border-style': 'solid',
+      'background-opacity': 0.92,
+      'color': '#F8FAFC',
+      'text-valign': 'center',
       'text-halign': 'center',
-      'text-margin-y': 10,
-      'font-size': 9.5,
+      'text-wrap': 'wrap',
+      'text-max-width': 68,
+      'font-size': 8.5,
       'font-family': 'JetBrains Mono, monospace',
-      'font-weight': 700,
-      'text-background-color': '#060B14',
-      'text-background-opacity': 0.95,
-      'text-background-padding': '4px',
-      'text-background-shape': 'round-rectangle',
-      'text-border-color': '#1E2D4A',
-      'text-border-width': 1.2,
-      'text-border-opacity': 1.0,
-      'text-max-width': '140px',
-      'text-wrap': 'ellipsis',
+      'font-weight': '600',
+      'width': 74,
+      'height': 74,
+      'text-outline-width': 1,
+      'text-outline-color': '#020617',
       'overlay-opacity': 0,
-      'transition-property': 'background-color, border-color, border-width, opacity, shadow-blur, shadow-opacity',
-      'transition-duration': '0.2s'
+      'transition-property': 'background-color, border-color, border-width, width, height, opacity',
+      'transition-duration': '0.18s'
     }
   },
 
-  /* ── Master Edge: Directional Dashed Threat Flow with Currency Badge ── */
+  // ── BASE EDGE DEFINITION ──────────────────────────────────────────────────
   {
     selector: 'edge',
     style: {
-      'label': (e) => getEdgeLabel(e),
-      'width': (e) => e.data('is_primary_path') ? 3.4 : 2.2,
-      'line-style': 'dashed',
-      'line-dash-pattern': [8, 5],
-      'line-color': (e) => getEdgeColor(e),
-      'target-arrow-color': (e) => getEdgeColor(e),
-      'target-arrow-shape': 'triangle',
-      'arrow-scale': (e) => e.data('is_primary_path') ? 1.35 : 1.15,
-      'curve-style': 'bezier',
-      'control-point-step-size': 40,
-
-      // Edge Currency Badge Label
-      'font-size': 9,
-      'font-family': 'JetBrains Mono, monospace',
-      'font-weight': 700,
-      'color': (e) => {
-        const isSusp = e.data('is_suspicious') || e.data('suspicious') || e.hasClass('suspicious-edge');
-        return isSusp ? '#FCA5A5' : '#93C5FD';
+      'label': (edge) => {
+        const amt = Number(edge.data('amount') || 0);
+        const formatted = new Intl.NumberFormat('en-IN').format(Math.round(amt));
+        const ch = edge.data('channel') || 'UPI';
+        const hop = edge.data('hop_number') || 1;
+        const totalHops = edge.data('total_hops');
+        const hopStr = totalHops > 1 ? ` · H${hop}/${totalHops}` : (hop > 1 ? ` · H${hop}` : '');
+        return `₹${formatted} · ${ch}${hopStr}`;
       },
+      'width': (edge) => edge.data('suspicious') ? 2.5 : 2,
+      'line-color': (edge) => edge.data('suspicious') ? '#EF4444' : '#38BDF8',
+      'target-arrow-color': (edge) => edge.data('suspicious') ? '#EF4444' : '#38BDF8',
+      'line-style': (edge) => edge.data('suspicious') ? 'dashed' : 'solid',
+      'line-dash-pattern': [6, 4],
+      'target-arrow-shape': 'triangle',
+      'arrow-scale': 1.25,
+      'curve-style': 'bezier',
+      'control-point-step-size': 50,
+      'font-size': 8.5,
+      'font-family': 'JetBrains Mono, monospace',
+      'font-weight': '500',
+      'color': '#E2E8F0',
       'text-rotation': 'autorotate',
-      'text-margin-y': -11,
-      'text-background-color': '#080608',
-      'text-background-opacity': 0.95,
-      'text-background-padding': '3.5px',
-      'text-background-shape': 'round-rectangle',
-      'text-border-color': (e) => getEdgeColor(e),
-      'text-border-width': 1.2,
-      'text-border-opacity': 0.95,
-      'opacity': (e) => e.data('is_primary_path') === false ? 0.7 : 0.95,
-      'transition-property': 'line-color, target-arrow-color, opacity, width, shadow-blur',
-      'transition-duration': '0.25s'
+      'text-margin-y': -10,
+      'text-background-color': '#0B132B',
+      'text-background-opacity': 0.96,
+      'text-background-padding': '3px',
+      'text-border-color': '#1E293B',
+      'text-border-width': 1,
+      'text-border-opacity': 1,
+      'opacity': 0.9,
+      'transition-property': 'line-color, target-arrow-color, width, opacity, text-border-color, text-background-color',
+      'transition-duration': '0.18s'
     }
   },
 
-  /* ── Selected Path Highlighting ────────────────────────────────────────── */
+  // ── PRECISION MONEY FLOW HOVER CLASSES ────────────────────────────────────
   {
-    selector: 'edge.highlighted, edge.path-highlight, edge.traced-edge',
+    // The node directly inspected by cursor
+    selector: 'node.node-hovered',
     style: {
-      'width': 4.0,
-      'line-style': 'solid',
+      'border-width': 3.5,
+      'border-color': '#F8FAFC',
+      'width': 80,
+      'height': 80,
+      'background-opacity': 1,
+      'z-index': 100
+    }
+  },
+  {
+    // Immediate Incoming Edge(s): Money entering the hovered entity
+    selector: 'edge.flow-incoming',
+    style: {
+      'width': 3.5,
+      'line-color': '#10B981',
+      'target-arrow-color': '#10B981',
+      'opacity': 1,
+      'z-index': 85,
+      'text-background-color': '#06281D',
+      'text-border-color': '#10B981',
+      'text-border-width': 1,
+      'color': '#A7F3D0',
+      'font-weight': '600',
+      'arrow-scale': 1.35
+    }
+  },
+  {
+    // Immediate Outgoing Edge(s): Money leaving the hovered entity
+    selector: 'edge.flow-outgoing',
+    style: {
+      'width': 3.5,
+      'line-color': '#F59E0B',
+      'target-arrow-color': '#F59E0B',
+      'opacity': 1,
+      'z-index': 85,
+      'text-background-color': '#2B1704',
+      'text-border-color': '#F59E0B',
+      'text-border-width': 1,
+      'color': '#FDE68A',
+      'font-weight': '600',
+      'arrow-scale': 1.35
+    }
+  },
+  {
+    // Upstream Source node connected via an incoming flow
+    selector: 'node.node-flow-source',
+    style: {
+      'border-width': 3,
+      'border-color': '#10B981',
+      'opacity': 1,
+      'z-index': 80
+    }
+  },
+  {
+    // Downstream Target node connected via an outgoing flow
+    selector: 'node.node-flow-target',
+    style: {
+      'border-width': 3,
+      'border-color': '#F59E0B',
+      'opacity': 1,
+      'z-index': 80
+    }
+  },
+  {
+    // Directly hovered transaction edge
+    selector: 'edge.edge-hovered',
+    style: {
+      'width': 4,
       'line-color': '#38BDF8',
       'target-arrow-color': '#38BDF8',
-      'target-arrow-shape': 'triangle',
-      'arrow-scale': 1.4,
-      'opacity': 1.0,
-      'z-index': 50,
-      'shadow-blur': 18,
-      'shadow-color': '#38BDF8',
-      'shadow-opacity': 0.9,
-      'color': '#E0F2FE',
-      'text-background-color': '#031428',
+      'opacity': 1,
+      'z-index': 95,
+      'text-background-color': '#0C2340',
       'text-border-color': '#38BDF8',
-      'text-border-width': 1.5
+      'text-border-width': 1,
+      'color': '#F0F9FF',
+      'font-weight': '600',
+      'arrow-scale': 1.4
     }
   },
+
+  // ── SELECTION & TRACING STATES ────────────────────────────────────────────
   {
-    selector: 'node.highlighted, node.path-highlight, node.hovered-focus, node:selected',
+    // Selected node - subtle blue glow
+    selector: 'node:selected',
     style: {
-      'border-width': 4.0,
+      'border-width': 3.5,
       'border-color': '#38BDF8',
-      'shadow-blur': 26,
-      'shadow-color': '#38BDF8',
-      'shadow-opacity': 0.95,
-      'z-index': 40
+      'width': 82,
+      'height': 82,
+      'z-index': 90
     }
   },
   {
+    // Selected edge
     selector: 'edge:selected',
     style: {
-      'width': 4.0,
+      'width': 4,
       'line-color': '#38BDF8',
       'target-arrow-color': '#38BDF8',
-      'z-index': 50
+      'z-index': 90
     }
   },
-
-  /* ── Suspicious Flow Edge ──────────────────────────────────────────────── */
   {
-    selector: 'edge.suspicious-edge',
+    selector: 'node.path-highlight',
     style: {
-      'line-color': '#EF4444',
-      'target-arrow-color': '#EF4444',
-      'text-border-color': '#EF4444',
-      'color': '#FCA5A5'
+      'border-width': 4,
+      'border-color': '#38BDF8',
+      'background-opacity': 1,
+      'z-index': 70
+    }
+  },
+  {
+    selector: 'edge.path-highlight',
+    style: {
+      'width': 4.5,
+      'line-color': '#38BDF8',
+      'target-arrow-color': '#38BDF8',
+      'opacity': 1,
+      'z-index': 70,
+      'line-style': 'solid',
+      'text-background-color': '#0C2340',
+      'text-border-color': '#38BDF8',
+      'text-border-width': 1
     }
   },
   {
     selector: 'edge.new-transaction-pulse',
     style: {
-      'width': 4.5,
+      'width': 5,
       'line-color': '#EF4444',
       'target-arrow-color': '#EF4444',
       'opacity': 1,
-      'z-index': 45
+      'z-index': 100,
+      'text-background-color': '#7F1D1D',
+      'text-border-color': '#EF4444',
+      'text-border-width': 1.5
+    }
+  },
+  {
+    // Dimmed state for unrelated elements during focus/hover
+    selector: '.dimmed',
+    style: {
+      'opacity': 0.18
     }
   },
 
-  /* ── Dimmed Unselected Graph Elements ─────────────────────────────────── */
+  // ── REVEAL ANIMATION CLASSES ─────────────────────────────────────────────
   {
-    selector: 'node.dimmed',
+    // Elements hidden by the progressive reveal animation.
+    selector: '.reveal-hidden',
     style: {
-      'opacity': 0.12,
-      'shadow-opacity': 0,
-      'background-image-opacity': 0.1
+      'opacity': 0,
+      'events': 'no'
     }
   },
   {
-    selector: 'edge.dimmed',
+    // Applied to a destination node the moment it is revealed.
+    selector: 'node.node-arriving',
     style: {
-      'opacity': 0.08,
-      'shadow-opacity': 0
+      'border-width': 4,
+      'border-color': '#7DD3FC',
+      'width': 84,
+      'height': 84,
+      'background-opacity': 1,
+      'z-index': 100,
+      'transition-property': 'width, height, border-width, border-color, background-opacity',
+      'transition-duration': '0.35s'
     }
   }
 ];
