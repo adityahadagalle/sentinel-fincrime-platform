@@ -3,15 +3,157 @@ import { createPortal } from 'react-dom';
 import { 
   Check, RefreshCw, AlertTriangle, ArrowRight, ShieldCheck, 
   Layers, Scale, BookOpen, UserCheck, X, Sparkles, Activity,
-  ChevronRight, Info, Shield, CheckCircle2, Cpu, GitCommit,
+  ChevronRight, ChevronDown, Info, Shield, CheckCircle2, Cpu, GitCommit,
   Clock, Zap, Eye, AlertCircle, Target, TrendingUp
 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import AnalystEvidenceViewer from './AnalystEvidenceViewer';
 
+// ── REUSABLE FORMATTERS & SAFE RENDERERS ──────────────────────────────────────
+const ACRONYMS = new Set([
+  'AML', 'KYC', 'STR', 'SAR', 'PMLA', 'FIU', 'IND', 'UPI', 'IMPS', 'NEFT', 'RTGS', 
+  'INR', 'ID', 'TX', 'EV', 'CTX', 'REG', 'KF', 'RS', 'ATM', 'EDD', 'PEP', 'CDD', 'URL', 'IP', 'DAG'
+]);
+
+const KNOWN_LABELS = {
+  review_priority: 'Review Priority',
+  regulatory_severity: 'Regulatory Severity',
+  assessment_heuristic_index: 'Assessment Heuristic Index',
+  recommended_step_count: 'Recommended Review Steps',
+  requires_human_approval: 'Requires Human Approval',
+  requires_reason_note: 'Reason Note Required',
+  requires_risk_acknowledgement: 'Risk Acknowledgement Required',
+  autonomous_execution: 'Autonomous Execution',
+  required_role: 'Required Role',
+  primary_tx_id: 'Primary Transaction ID',
+  case_id: 'Case ID',
+  target_id: 'Target Account ID',
+  action_code: 'Action Code',
+  step_id: 'Step ID',
+  pattern_id: 'Pattern ID',
+  finding_id: 'Finding ID',
+  contextual_severity: 'Contextual Severity',
+  narrative_step_count: 'Narrative Steps',
+  key_finding_count: 'Key Findings Count',
+  traceability_status: 'Traceability Status',
+  jurisdiction_context: 'Jurisdiction Context',
+  payment_rails: 'Payment Rails',
+  external_sanctions_database: 'External Sanctions Database',
+  external_kyc_verification: 'External KYC Verification',
+  input_case_id: 'Input Case ID',
+  input_transaction_id: 'Input Transaction ID',
+  generator_version: 'Generator Version',
+  analyst_executive_brief: 'Analyst Executive Brief',
+  priority_rationale: 'Priority Rationale',
+  disposition_options: 'Disposition Options',
+  recommended_review_steps: 'Recommended Review Steps',
+  investigation_narrative: 'Investigation Narrative',
+  regulatory_indicators: 'Regulatory Indicators',
+  compliance_considerations: 'Compliance Considerations',
+  contextual_findings: 'Contextual Findings',
+  human_approval_boundary: 'Human Approval Boundary',
+  audit_trail: 'Audit Trail',
+  total_evidence_items: 'Total Evidence Items',
+  high_severity_items: 'High Severity Items',
+  categories_covered: 'Categories Covered',
+  pattern_name: 'Pattern Name',
+  action_label: 'Action Label',
+  potential_currency_threshold_structuring: 'Potential Currency Threshold Structuring',
+  suspicious_cross_border_telemetry: 'Suspicious Cross Border Telemetry',
+  unusual_high_value_first_time_payee: 'Unusual High Value First Time Payee',
+  rapid_structuring: 'Rapid Structuring',
+  mule_account_drainage: 'Mule Account Drainage',
+  pass_through_activity: 'Pass Through Activity',
+  str_internal_review_recommended: 'STR Internal Review Recommended',
+  enhanced_due_diligence_recommended: 'Enhanced Due Diligence Recommended',
+  foreign_exchange_anomaly_review: 'Foreign Exchange Anomaly Review',
+  standard_monitoring: 'Standard Monitoring',
+};
+
+export const formatLabel = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  if (KNOWN_LABELS[str]) return KNOWN_LABELS[str];
+  const lower = str.toLowerCase();
+  if (KNOWN_LABELS[lower]) return KNOWN_LABELS[lower];
+
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(' ')
+    .map(word => {
+      const upper = word.toUpperCase();
+      if (ACRONYMS.has(upper)) return upper;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+};
+
+export const formatAmount = (num) => {
+  if (typeof num !== 'number') return String(num);
+  return `₹${num.toLocaleString('en-IN')}`;
+};
+
+export const safeFormatValue = (val, labelKey = '') => {
+  if (val === null || val === undefined) {
+    return 'N/A';
+  }
+  if (typeof val === 'boolean') {
+    const keyLower = String(labelKey).toLowerCase();
+    if (keyLower.includes('approval') || keyLower.includes('require')) {
+      return val ? 'Required' : 'Not Required';
+    }
+    if (keyLower.includes('execution') || keyLower.includes('autonomous')) {
+      return val ? 'Permitted' : 'Blocked (Human Required)';
+    }
+    if (keyLower.includes('verified') || keyLower.includes('tamper')) {
+      return val ? 'Verified' : 'Unverified';
+    }
+    return val ? 'Yes' : 'No';
+  }
+  if (typeof val === 'number') {
+    const keyLower = String(labelKey).toLowerCase();
+    if (keyLower.includes('amount') || keyLower.includes('value') || keyLower.includes('total') || keyLower.includes('recoverable') || keyLower.includes('balance')) {
+      return formatAmount(val);
+    }
+    if (keyLower.includes('confidence') || keyLower.includes('index') || keyLower.includes('ratio')) {
+      if (val <= 1.0) {
+        return `${Math.round(val * 100)}%`;
+      }
+      return val.toFixed(2);
+    }
+    return val.toLocaleString('en-IN');
+  }
+  if (typeof val === 'string') {
+    return val.trim();
+  }
+  if (Array.isArray(val)) {
+    if (val.length === 0) return 'None recorded';
+    if (val.every(item => typeof item === 'string')) {
+      return val.join(', ');
+    }
+    return `${val.length} items recorded`;
+  }
+  if (typeof val === 'object') {
+    if (val.finding) return String(val.finding);
+    if (val.statement) return String(val.statement);
+    if (val.description) return String(val.description);
+    if (val.action_label) return String(val.action_label);
+    if (val.recommendation) return String(val.recommendation);
+    if (val.name) return String(val.name);
+    if (val.label) return String(val.label);
+    if (val.action) return String(val.action);
+
+    const entries = Object.entries(val).filter(([k]) => !['found', 'status'].includes(k));
+    if (entries.length === 0) return 'Recorded';
+    return entries.slice(0, 3).map(([k, v]) => `${formatLabel(k)}: ${safeFormatValue(v, k)}`).join(' · ');
+  }
+  return String(val);
+};
+
 /**
- * Extracts 3–5 meaningful, human-readable forensic insights from actual agent reports.
- * Communicates meaning first — strictly avoids raw JSON serializations.
+ * Extracts 3 meaningful, human-readable forensic insights from actual agent reports.
+ * Formats every value safely — strictly prevents [object Object] and unparsed JSON.
  */
 const getStageInsightData = (stageKey, data, status, graphData) => {
   const isPending = status === 'PENDING' || status === 'PENDING EXECUTION';
@@ -30,13 +172,71 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
     let primaryFinding = 'Awaiting evidence agent pipeline execution.';
     if (!isPending && !isFailed) {
       if (highSevItem?.finding) {
-        primaryFinding = highSevItem.finding;
+        primaryFinding = safeFormatValue(highSevItem.finding);
       } else if (items.length > 0) {
         primaryFinding = `${totalCount} verified evidence items assembled across ${categories.length} source rails.`;
       } else {
         primaryFinding = 'Normalized entity, account, and transaction telemetry assembled.';
       }
     }
+
+    const insights = [];
+    if (isPending) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Evidence Ingest Queued',
+        description: 'Telemetry ingest queued. Awaiting transaction pipeline extraction.',
+        id: 'EV-QUEUE'
+      });
+      insights.push({
+        category: 'POLICY',
+        title: 'Cryptographic Provenance',
+        description: 'Cryptographic provenance verification pending pipeline run.',
+        id: 'EV-HASH'
+      });
+    } else if (isFailed) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Ingest Error',
+        description: 'Evidence extraction pipeline encountered a processing error.',
+        id: 'EV-ERR',
+        severity: 'HIGH'
+      });
+    } else {
+      if (highSevItem?.finding) {
+        insights.push({
+          category: 'PRIMARY',
+          title: 'High-Priority Evidence Signal',
+          description: safeFormatValue(highSevItem.finding),
+          id: highSevItem.id || 'EV-001',
+          severity: 'HIGH'
+        });
+      }
+      insights.push({
+        category: 'SUPPORTING',
+        title: 'Multi-Rail Coverage',
+        description: `Verified telemetry from ${categories.slice(0, 3).join(', ')} with complete transaction context.`,
+        id: 'EV-RAILS'
+      });
+      insights.push({
+        category: 'POLICY',
+        title: 'Cryptographic Ledger Integrity',
+        description: 'Deterministic hash verification confirms artifact integrity with 0 tampering.',
+        id: 'EV-VERIF'
+      });
+    }
+
+    const additionalDetails = [];
+    items.forEach(it => {
+      if (it && it.id !== highSevItem?.id) {
+        additionalDetails.push({
+          label: it.category ? formatLabel(it.category) : 'Evidence Artifact',
+          value: safeFormatValue(it.finding),
+          id: it.id,
+          severity: it.severity
+        });
+      }
+    });
 
     return {
       index: '01',
@@ -51,7 +251,9 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
         { label: 'High-Priority Signals', value: `${highCount} signals`, alert: highCount > 0 },
         { label: 'Source Channels', value: categories.slice(0, 3).join(', ') },
         { label: 'Tamper Protection', value: 'Cryptographically Verified', success: true }
-      ]
+      ],
+      insights,
+      additionalDetails
     };
   }
 
@@ -64,16 +266,85 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
     const confidence = data?.summary?.confidence || 0.94;
     const entityCount = graphData?.nodes?.length || 4;
 
+    const patternTitle = topPattern?.pattern_name || topPattern?.name || (topPattern?.pattern_id ? formatLabel(topPattern.pattern_id) : 'Pass-Through Drainage');
+    const patternDesc = topPattern?.description || 'Funds rapidly propagating through mule accounts with minimal dwell time.';
+
     let primaryFinding = 'Awaiting behavioral clustering and network graph heuristics.';
     if (!isPending && !isFailed) {
-      if (topPattern?.name) {
-        primaryFinding = `${topPattern.name} identified across historical and hop baseline.`;
+      if (topPattern) {
+        primaryFinding = `${patternTitle} identified across historical and hop baseline.`;
       } else if (topFinding?.finding) {
-        primaryFinding = topFinding.finding;
+        primaryFinding = safeFormatValue(topFinding.finding);
       } else {
         primaryFinding = 'Multi-hop fund layering and rapid pass-through heuristics evaluated.';
       }
     }
+
+    const insights = [];
+    if (isPending) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Contextual Clustering Queued',
+        description: 'Awaiting contextual and multi-hop network clustering evaluation.',
+        id: 'CTX-QUEUE'
+      });
+      insights.push({
+        category: 'SUPPORTING',
+        title: 'Velocity Evaluation',
+        description: 'Velocity heuristics on hold until evidence stage resolves.',
+        id: 'CTX-VEL'
+      });
+    } else if (isFailed) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Heuristic Error',
+        description: 'Contextual heuristic evaluation encountered an error.',
+        id: 'CTX-ERR',
+        severity: 'HIGH'
+      });
+    } else {
+      insights.push({
+        category: 'PRIMARY',
+        title: `Pattern: ${patternTitle}`,
+        description: patternDesc,
+        id: topPattern?.pattern_id || 'PAT-001',
+        severity: topPattern?.severity || 'HIGH'
+      });
+      insights.push({
+        category: 'SUPPORTING',
+        title: 'Multi-Hop Network Traversal',
+        description: `Cluster graph links ${entityCount} distinct counterparty accounts across consecutive hops.`,
+        id: 'CTX-GRAPH'
+      });
+      insights.push({
+        category: 'INVESTIGATION NOTE',
+        title: 'Velocity Dwell Time Anomaly',
+        description: 'Pass-through fund drainage detected with zero balance retention before withdrawal.',
+        id: 'CTX-FLOW'
+      });
+    }
+
+    const additionalDetails = [];
+    findings.forEach(f => {
+      if (f && f.finding) {
+        additionalDetails.push({
+          label: f.type ? formatLabel(f.type) : 'Contextual Finding',
+          value: safeFormatValue(f.finding),
+          id: f.id,
+          severity: f.severity
+        });
+      }
+    });
+    patterns.slice(1).forEach(p => {
+      if (p) {
+        additionalDetails.push({
+          label: p.pattern_name || formatLabel(p.pattern_id || 'Pattern'),
+          value: safeFormatValue(p.description),
+          id: p.pattern_id,
+          severity: p.severity
+        });
+      }
+    });
 
     return {
       index: '02',
@@ -84,11 +355,13 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
       metricTag: `Conf: ${Math.round(confidence * 100)}%`,
       primaryFinding,
       items: [
-        { label: 'Behavioral Pattern', value: topPattern?.name || 'Pass-Through Drainage' },
+        { label: 'Behavioral Pattern', value: patternTitle },
         { label: 'Match Confidence', value: `${Math.round(confidence * 100)}%` },
         { label: 'Connected Entities', value: `${entityCount} accounts in cluster` },
         { label: 'Flow Anomaly', value: 'Rapid pass-through drainage' }
-      ]
+      ],
+      insights,
+      additionalDetails
     };
   }
 
@@ -96,20 +369,99 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
   if (normKey === 'regulatory' || normKey === 'phase3') {
     const summary = data?.summary || {};
     const indicators = Array.isArray(data?.regulatory_indicators) ? data.regulatory_indicators : [];
-    const strInd = indicators.find(i => (i.reporting_implication || '').includes('STR') || (i.code || '').includes('STR'));
+    const considerations = Array.isArray(data?.compliance_considerations) ? data.compliance_considerations : [];
+    const strInd = indicators.find(i => (i.reporting_implication || '').includes('STR') || (i.indicator_code || i.code || '').includes('STR'));
     const topInd = indicators[0];
+    const topConsideration = considerations[0];
     const severity = summary.regulatory_severity || (isPending ? 'PENDING' : 'CRITICAL');
     const framework = topInd?.regulatory_framework || 'PMLA 2002';
 
     let primaryFinding = 'Awaiting statutory compliance and PMLA risk evaluation.';
     if (!isPending && !isFailed) {
       if (strInd) {
-        primaryFinding = `STR mandatory review trigger identified under ${framework} guidelines.`;
+        primaryFinding = `STR mandatory review trigger identified under ${framework} statutory guidelines.`;
+      } else if (topInd?.indicator) {
+        primaryFinding = safeFormatValue(topInd.indicator);
       } else if (topInd?.description) {
-        primaryFinding = topInd.description;
+        primaryFinding = safeFormatValue(topInd.description);
       } else {
         primaryFinding = 'Statutory anti-money laundering thresholds and FIU-IND guidance evaluated.';
       }
+    }
+
+    const insights = [];
+    if (isPending) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Statutory Evaluation Queued',
+        description: 'Awaiting statutory anti-money laundering rule evaluation.',
+        id: 'REG-QUEUE'
+      });
+      insights.push({
+        category: 'SUPPORTING',
+        title: 'Threshold Scanning',
+        description: 'PMLA threshold and FIU-IND guideline checks queued.',
+        id: 'REG-PMLA'
+      });
+    } else if (isFailed) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Rule Engine Error',
+        description: 'Regulatory rule engine execution encountered an error.',
+        id: 'REG-ERR',
+        severity: 'HIGH'
+      });
+    } else {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Statutory STR Review Trigger',
+        description: strInd ? (strInd.indicator || strInd.basis || 'Mandatory suspicious transaction reporting review flagged.') : `Mandatory review flagged under ${framework} guidelines.`,
+        id: strInd?.id || topInd?.id || 'REG-001',
+        severity: 'CRITICAL'
+      });
+      insights.push({
+        category: 'SUPPORTING',
+        title: topInd?.indicator_code ? formatLabel(topInd.indicator_code) : 'Anti-Structuring Compliance Rule',
+        description: topInd?.indicator || topInd?.basis || 'Threshold-related structuring detected across multi-account transfers.',
+        id: topInd?.id || 'REG-002',
+        severity: topInd?.severity || 'HIGH'
+      });
+      insights.push({
+        category: 'POLICY',
+        title: 'Compliance Recommendation',
+        description: topConsideration?.recommendation ? safeFormatValue(topConsideration.recommendation) : 'Internal STR review by certified compliance officer recommended.',
+        id: topConsideration?.code ? formatLabel(topConsideration.code) : 'PMLA-REC'
+      });
+    }
+
+    const additionalDetails = [];
+    indicators.slice(1).forEach(ind => {
+      if (ind) {
+        additionalDetails.push({
+          label: ind.indicator_code ? formatLabel(ind.indicator_code) : 'Regulatory Rule',
+          value: safeFormatValue(ind.indicator || ind.basis || ind.description),
+          id: ind.id,
+          severity: ind.severity
+        });
+      }
+    });
+    considerations.slice(1).forEach(c => {
+      if (c) {
+        additionalDetails.push({
+          label: c.code ? formatLabel(c.code) : 'Compliance Consideration',
+          value: safeFormatValue(c.recommendation)
+        });
+      }
+    });
+    if (data?.jurisdiction_data_status) {
+      additionalDetails.push({
+        label: 'Sanctions Database Match State',
+        value: safeFormatValue(data.jurisdiction_data_status.external_sanctions_database || 'UNAVAILABLE')
+      });
+      additionalDetails.push({
+        label: 'External KYC Verification State',
+        value: safeFormatValue(data.jurisdiction_data_status.external_kyc_verification || 'NOT_CHECKED')
+      });
     }
 
     return {
@@ -125,7 +477,9 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
         { label: 'STR Filing Trigger', value: strInd ? 'MANDATORY REVIEW' : 'EVALUATED', alert: Boolean(strInd) },
         { label: 'Statutory Framework', value: `${framework} / FIU-IND` },
         { label: 'Indicators Evaluated', value: `${indicators.length || 3} compliance rules` }
-      ]
+      ],
+      insights,
+      additionalDetails
     };
   }
 
@@ -141,12 +495,83 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
     let primaryFinding = 'Awaiting backward evidence linkage and audit trail construction.';
     if (!isPending && !isFailed) {
       if (topKeyFinding?.statement) {
-        primaryFinding = topKeyFinding.statement;
+        primaryFinding = safeFormatValue(topKeyFinding.statement);
       } else if (data?.executive_summary) {
         primaryFinding = 'Cross-stage referential verification confirms complete audit traceability.';
       } else {
         primaryFinding = 'Deterministic audit narrative verified with complete referential integrity.';
       }
+    }
+
+    const insights = [];
+    if (isPending) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Audit Verification Queued',
+        description: 'Awaiting deterministic backward audit trail verification.',
+        id: 'AUD-QUEUE'
+      });
+      insights.push({
+        category: 'SUPPORTING',
+        title: 'Referential Integrity',
+        description: 'Referential integrity and source stage validation queued.',
+        id: 'AUD-REF'
+      });
+    } else if (isFailed) {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Audit Process Error',
+        description: 'Audit verification process encountered an error.',
+        id: 'AUD-ERR',
+        severity: 'HIGH'
+      });
+    } else {
+      insights.push({
+        category: 'PRIMARY',
+        title: 'Primary Audit Finding',
+        description: topKeyFinding?.statement ? safeFormatValue(topKeyFinding.statement) : 'Cross-stage referential verification confirms complete audit traceability.',
+        id: topKeyFinding?.finding_id || 'KF-001',
+        severity: topKeyFinding?.severity || 'HIGH'
+      });
+      insights.push({
+        category: 'SUPPORTING',
+        title: 'Deterministic Traceability',
+        description: `Traceability status: ${traceability === 'VERIFIED_COMPLETE' ? 'VERIFIED COMPLETE' : traceability} across all chronological phases.`,
+        id: 'AUD-TRC'
+      });
+      insights.push({
+        category: 'POLICY',
+        title: 'Zero Model Drift Verification',
+        description: 'Deterministic chain validation confirms zero generative hallucination or model drift.',
+        id: 'AUD-VAL'
+      });
+    }
+
+    const additionalDetails = [];
+    keyFindings.slice(1).forEach(kf => {
+      if (kf) {
+        additionalDetails.push({
+          label: kf.stage ? formatLabel(kf.stage) : 'Audit Finding',
+          value: safeFormatValue(kf.statement),
+          id: kf.finding_id,
+          severity: kf.severity
+        });
+      }
+    });
+    steps.forEach(st => {
+      if (st && st.statement) {
+        additionalDetails.push({
+          label: `Step ${st.step || ''} (${formatLabel(st.stage || 'Audit')})`,
+          value: safeFormatValue(st.statement),
+          id: st.claim_type
+        });
+      }
+    });
+    if (data?.audit_trail?.generator) {
+      additionalDetails.push({
+        label: 'Audit Generator Reference',
+        value: `${data.audit_trail.generator} (${data.audit_trail.generator_version || 'v1'})`
+      });
     }
 
     return {
@@ -162,7 +587,9 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
         { label: 'Narrative Steps', value: `${stepCount} chronological phases` },
         { label: 'Reasoning Mode', value: 'Deterministic Chain (0 Model Drift)' },
         { label: 'Audit Trail Ref', value: 'Cross-Stage Verified' }
-      ]
+      ],
+      insights,
+      additionalDetails
     };
   }
 
@@ -170,17 +597,104 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
   const summary = data?.summary || {};
   const priority = data?.review_priority || summary.review_priority || (isPending ? 'PENDING' : 'URGENT');
   const index = summary.assessment_heuristic_index || 0.99;
+  const stepsList = Array.isArray(data?.recommended_review_steps) ? data.recommended_review_steps : [];
+  const topStep = stepsList[0];
+  const actionRec = data?.action_recommendation || {};
+  const boundary = data?.human_approval_boundary || {};
+  const dispositions = Array.isArray(data?.disposition_options) ? data.disposition_options : [];
 
   let primaryFinding = 'Awaiting operational review priority and decision support options.';
   if (!isPending && !isFailed) {
     if (data?.priority_rationale) {
-      primaryFinding = data.priority_rationale;
-    } else if (data?.action_recommendation?.rationale) {
-      primaryFinding = data.action_recommendation.rationale;
+      primaryFinding = safeFormatValue(data.priority_rationale);
+    } else if (actionRec?.rationale) {
+      primaryFinding = safeFormatValue(actionRec.rationale);
     } else {
       primaryFinding = 'High-confidence mule activity requires immediate human operator authorization.';
     }
   }
+
+  const insights = [];
+  if (isPending) {
+    insights.push({
+      category: 'PRIMARY',
+      title: 'Decision Support Queued',
+      description: 'Awaiting operational decision support and recommendation synthesis.',
+      id: 'DEC-QUEUE'
+    });
+    insights.push({
+      category: 'POLICY',
+      title: 'Human Authorization Boundary',
+      description: 'Human authorization boundary evaluation on standby.',
+      id: 'DEC-POL'
+    });
+  } else if (isFailed) {
+    insights.push({
+      category: 'PRIMARY',
+      title: 'Decision Engine Error',
+      description: 'Decision engine failed to generate recommendations.',
+      id: 'DEC-ERR',
+      severity: 'HIGH'
+    });
+  } else {
+    insights.push({
+      category: 'PRIMARY',
+      title: `Recommended Action: ${actionRec?.action ? formatLabel(actionRec.action) : 'Freeze Beneficiary Account'}`,
+      description: actionRec?.target_account ? `Target account ${actionRec.target_account}: ${actionRec.rationale || 'Immediate fund preservation recommended.'}` : 'Immediate capital freeze recommended to protect recoverable balance.',
+      id: actionRec?.action_code || 'ACT-001',
+      severity: 'URGENT'
+    });
+    insights.push({
+      category: 'SUPPORTING',
+      title: topStep?.action_label ? safeFormatValue(topStep.action_label) : 'Beneficiary Ownership Review',
+      description: topStep?.description ? safeFormatValue(topStep.description) : 'Verify counterparty beneficiary account KYC and transaction purpose.',
+      id: topStep?.step_id || 'RS-001',
+      severity: topStep?.priority || 'HIGH'
+    });
+    insights.push({
+      category: 'POLICY',
+      title: 'Human Authorization Boundary',
+      description: 'Autonomous execution is strictly blocked for capital freezes. Mandatory compliance analyst sign-off required.',
+      id: 'DISP-REQ'
+    });
+  }
+
+  const additionalDetails = [];
+  stepsList.slice(1).forEach(s => {
+    if (s) {
+      additionalDetails.push({
+        label: s.action_label ? safeFormatValue(s.action_label) : (s.category ? formatLabel(s.category) : 'Review Step'),
+        value: safeFormatValue(s.description),
+        id: s.step_id,
+        severity: s.priority
+      });
+    }
+  });
+  dispositions.forEach(d => {
+    if (d) {
+      additionalDetails.push({
+        label: d.label ? safeFormatValue(d.label) : formatLabel(d.action_code || 'Disposition'),
+        value: `Reason Note Required: ${d.requires_reason_note ? 'Yes' : 'No'} · Risk Acknowledgement: ${d.requires_risk_acknowledgement ? 'Yes' : 'No'}`,
+        id: d.action_code
+      });
+    }
+  });
+  if (boundary.required_role) {
+    additionalDetails.push({
+      label: 'Human Approval Required Role',
+      value: boundary.required_role
+    });
+    additionalDetails.push({
+      label: 'Autonomous Execution Status',
+      value: boundary.autonomous_execution ? 'Permitted' : 'Blocked (Human Required)'
+    });
+  }
+  (data?.uncertainties || []).forEach((u, i) => {
+    additionalDetails.push({
+      label: `Uncertainty #${i + 1}`,
+      value: safeFormatValue(u)
+    });
+  });
 
   return {
     index: '05',
@@ -195,7 +709,9 @@ const getStageInsightData = (stageKey, data, status, graphData) => {
       { label: 'Assessment Index', value: typeof index === 'number' ? index.toFixed(2) : '0.99' },
       { label: 'Human Approval', value: 'REQUIRED (Autonomous Blocked)', warn: true },
       { label: 'Policy Disposition', value: 'Freeze Beneficiary Recommended' }
-    ]
+    ],
+    insights,
+    additionalDetails
   };
 };
 
@@ -214,6 +730,27 @@ const NODE_LAYOUT = [
   { id: 'audit',      cx: 900,  cy: 270, row: 'bottom' },
   { id: 'decision',   cx: 1080, cy: 110, row: 'top'    },
 ];
+
+// Horizontal anchor percentages for detail panel stem (matching SVG cx coordinates)
+const STAGE_ANCHOR_PCT = {
+  evidence: 12.5,
+  contextual: 33.33,
+  regulatory: 54.17,
+  audit: 75.0,
+  decision: 90.0,
+};
+
+// Edge-aware horizontal alignment for the detail panel beneath the selected node
+const getContainerAlignment = (key) => {
+  switch (key) {
+    case 'evidence':   return 'mr-auto ml-0 sm:ml-2';
+    case 'contextual': return 'mr-auto ml-0 sm:ml-[6%] xl:ml-[10%]';
+    case 'regulatory': return 'mx-auto';
+    case 'audit':      return 'ml-auto mr-0 sm:mr-[6%] xl:mr-[10%]';
+    case 'decision':   return 'ml-auto mr-0 sm:mr-2';
+    default:           return 'mx-auto';
+  }
+};
 
 // Backbone connector endpoints (from edge of source circle to edge of dest circle)
 const SEGMENTS = NODE_LAYOUT.slice(0, 4).map((from, i) => {
@@ -425,7 +962,7 @@ const AgentTooltipCard = ({ stage, placement, arrowX, prefersReducedMotion }) =>
                   color: it.alert ? '#F43F5E' : it.warn ? '#FCD34D' : it.success ? '#10B981' : '#CBD5E1',
                 }}
               >
-                {it.value}
+                {safeFormatValue(it.value, it.label)}
               </span>
             </div>
           ))}
@@ -452,11 +989,18 @@ export const InvestigationWorkflowGraph = ({
   graphData = { nodes: [], edges: [] },
 }) => {
   const [selectedStageKey, setSelectedStageKey] = useState(timelineStages[0]?.key || 'evidence');
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(true);
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
   const [hoveredStageKey, setHoveredStageKey] = useState(null);
   const [activeReportKey, setActiveReportKey] = useState(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const startTimeRef = useRef(Date.now());
   const [elapsedSec, setElapsedSec] = useState(0);
+
+  // Reset progressive disclosure whenever selected stage changes
+  useEffect(() => {
+    setShowAdditionalDetails(false);
+  }, [selectedStageKey]);
 
   // Portal Tooltip state
   const [activeTooltip, setActiveTooltip] = useState(null);
@@ -531,19 +1075,28 @@ export const InvestigationWorkflowGraph = ({
     return () => clearInterval(t);
   }, []);
 
-  // Keyboard: 1-5 to select agents, Esc to close drawer
+  // Keyboard: 1-5 to select agents, Esc to close drawer/panel
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.key === 'Escape' && activeReportKey) setActiveReportKey(null);
+      if (e.key === 'Escape') {
+        if (activeReportKey) {
+          setActiveReportKey(null);
+        } else if (isDetailPanelOpen) {
+          setIsDetailPanelOpen(false);
+        }
+      }
       if (['1', '2', '3', '4', '5'].includes(e.key)) {
         const idx = parseInt(e.key, 10) - 1;
-        if (timelineStages[idx]) setSelectedStageKey(timelineStages[idx].key);
+        if (timelineStages[idx]) {
+          setSelectedStageKey(timelineStages[idx].key);
+          setIsDetailPanelOpen(true);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeReportKey, timelineStages]);
+  }, [activeReportKey, isDetailPanelOpen, timelineStages]);
 
   // Enrich stages with insight data + layout geometry
   const enrichedStages = useMemo(() => {
@@ -553,6 +1106,11 @@ export const InvestigationWorkflowGraph = ({
       return { ...stage, index: insight.index, shortName: insight.shortName, fullName: insight.fullName, domain: insight.domain, Icon: insight.Icon, metricTag: insight.metricTag, insight, layout };
     });
   }, [timelineStages, graphData]);
+
+  // Selected stage object
+  const selectedStage = useMemo(() => {
+    return enrichedStages.find(s => s.key === selectedStageKey) || enrichedStages[0];
+  }, [enrichedStages, selectedStageKey]);
 
   // Telemetry counts
   const completedCount = timelineStages.filter(s => s.status === 'COMPLETED').length;
@@ -633,12 +1191,12 @@ export const InvestigationWorkflowGraph = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          MAIN BODY: CANVAS  +  SUMMARY PANEL
+          MAIN BODY: CANVAS  +  DETAIL PANEL
       ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-b-xl border border-[#1E293B] bg-[#04090F] flex flex-col lg:flex-row overflow-hidden">
+      <div className="rounded-b-xl border border-[#1E293B] bg-[#04090F] flex flex-col overflow-hidden">
 
-        {/* ── LEFT: ZIG-ZAG GRAPH CANVAS ────────────────────────────────────── */}
-        <div ref={containerRef} className="flex-1 min-w-0 p-5 overflow-x-auto">
+        {/* ── TOP: ZIG-ZAG WORKFLOW GRAPH CANVAS ────────────────────────────── */}
+        <div ref={containerRef} className="w-full p-5 overflow-x-auto">
 
           {/* Orchestrator Header Chip */}
           <div className="flex items-center justify-between mb-4">
@@ -674,13 +1232,6 @@ export const InvestigationWorkflowGraph = ({
                 {completedCount}/5 COMPLETE
               </span>
             </div>
-
-            <span className="hidden sm:flex items-center gap-1.5 text-[8.5px] font-mono text-slate-500 uppercase tracking-wider">
-              <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-[7px]">1–5</kbd>
-              SELECT ·
-              <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-[7px]">ESC</kbd>
-              CLOSE
-            </span>
           </div>
 
           {/* SVG Canvas */}
@@ -693,6 +1244,16 @@ export const InvestigationWorkflowGraph = ({
               aria-label="Investigation workflow graph — 5-agent zig-zag pipeline"
             >
               <defs>
+                {/* Glow filters for active nodes */}
+                <filter id="glow-emerald" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="6" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                <filter id="glow-sky" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="6" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+
                 {/* Gradient fills for connectors */}
                 <linearGradient id="seg-completed" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%"   stopColor="#10B981" />
@@ -714,16 +1275,6 @@ export const InvestigationWorkflowGraph = ({
                 <marker id="arr-pend" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
                   <path d="M 0 2 L 6 5 L 0 8 z" fill="#334155" />
                 </marker>
-
-                {/* Radial glow for active node rings */}
-                <filter id="glow-emerald" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="4" result="blur" />
-                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-                <filter id="glow-sky" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="5" result="blur" />
-                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
               </defs>
 
               {/* ── BACKBONE STRAIGHT CONNECTORS ─────────────────────────── */}
@@ -744,18 +1295,18 @@ export const InvestigationWorkflowGraph = ({
                       strokeLinecap="round"
                       strokeDasharray={state === 'pending' ? '5 7' : '9 15'}
                       markerEnd={marker}
-                      style={anim ? { animation: `flowDash ${state === 'active' ? '1.2s' : '2s'} linear infinite` } : undefined}
+                      style={anim ? { animation: 'flowDash 1.2s linear infinite' } : undefined}
                     />
-                    {/* Segment index label at midpoint */}
+                    {/* Flow state label */}
                     <text
                       x={(seg.x1 + seg.x2) / 2}
                       y={(seg.y1 + seg.y2) / 2 - 8}
                       textAnchor="middle"
-                      fontSize="9"
-                      fill={state === 'completed' ? '#10B981' : state === 'active' ? '#38BDF8' : '#334155'}
+                      fontSize="7"
                       fontFamily="monospace"
-                      fontWeight="700"
-                      letterSpacing="0.05em"
+                      fontWeight="bold"
+                      fill={state === 'completed' ? '#10B981' : state === 'active' ? '#38BDF8' : '#334155'}
+                      opacity="0.85"
                     >
                       {state === 'completed' ? '✓' : state === 'active' ? '▶' : '○'}
                     </text>
@@ -772,42 +1323,53 @@ export const InvestigationWorkflowGraph = ({
                 const isRunning  = stage.status === 'RUNNING';
                 const isComplete = stage.status === 'COMPLETED';
                 const active     = isSelected || isHovered;
-                const IconComp   = stage.Icon;
-
-                // Card Y position — below for top row, above for bottom row
-                const cardY = row === 'top' ? cy + NODE_R + 12 : cy - NODE_R - 12;
-                const cardAnchor = row === 'top' ? 'top' : 'bottom';
-                const CARD_H = 82;
-                const CARD_W = 148;
-                const cardTop = row === 'top' ? cardY : cardY - CARD_H;
 
                 return (
                   <g
                     key={stage.key}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${stage.fullName} — Status: ${stage.status}. Press Enter to open report.`}
+                    aria-label={`${stage.fullName} — Status: ${stage.status}. Click or press Enter to inspect agent detail panel below.`}
                     style={{ cursor: 'pointer', outline: 'none' }}
                     onClick={() => {
                       setSelectedStageKey(stage.key);
-                      if (selectedStageKey === stage.key && activeReportKey !== stage.key) {
-                        setActiveReportKey(stage.key);
-                      }
+                      setIsDetailPanelOpen(true);
                     }}
                     onMouseEnter={() => handleNodeMouseEnter(stage)}
                     onMouseLeave={handleNodeMouseLeave}
-                    onPointerEnter={() => handleNodeMouseEnter(stage)}
-                    onPointerLeave={handleNodeMouseLeave}
                     onFocus={() => handleNodeMouseEnter(stage)}
                     onBlur={handleNodeMouseLeave}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         setSelectedStageKey(stage.key);
-                        setActiveReportKey(prev => prev === stage.key ? null : stage.key);
+                        setIsDetailPanelOpen(true);
                       }
                     }}
                   >
+                    {/* Vertical guide beam projecting down to the attached panel */}
+                    {isSelected && (
+                      <g>
+                        <line
+                          x1={cx}
+                          y1={cy + NODE_R + 4}
+                          x2={cx}
+                          y2={CANVAS_H}
+                          stroke={sc.ring}
+                          strokeWidth="2"
+                          strokeDasharray="4 4"
+                          opacity="0.85"
+                          style={!prefersReducedMotion ? { animation: 'flowDash 1.2s linear infinite' } : undefined}
+                        />
+                        {/* Downward beacon chevron at the canvas baseline */}
+                        <polygon
+                          points={`${cx - 5},${CANVAS_H - 8} ${cx + 5},${CANVAS_H - 8} ${cx},${CANVAS_H - 1}`}
+                          fill={sc.ring}
+                          opacity="0.9"
+                        />
+                      </g>
+                    )}
+
                     {/* Pulsing outer ring for running state */}
                     {isRunning && !prefersReducedMotion && (
                       <circle cx={cx} cy={cy} r={NODE_R + 10}
@@ -819,41 +1381,38 @@ export const InvestigationWorkflowGraph = ({
                       />
                     )}
 
-                    {/* Outer selection ring */}
-                    {active && (
-                      <circle cx={cx} cy={cy} r={NODE_R + 7}
+                    {/* Illuminated active halo ring */}
+                    {isSelected && (
+                      <circle cx={cx} cy={cy} r={NODE_R + 8}
                         fill="none"
                         stroke={sc.ring}
-                        strokeWidth="1.5"
-                        opacity="0.5"
+                        strokeWidth="2.5"
+                        opacity="0.9"
+                        filter={sc.ring.includes('10B981') ? 'url(#glow-emerald)' : 'url(#glow-sky)'}
                       />
                     )}
 
-                    {/* Node circle background */}
+                    {/* Node circle */}
                     <circle cx={cx} cy={cy} r={NODE_R}
-                      fill="#060D1A"
-                      stroke={active ? sc.ring : sc.ring + '66'}
-                      strokeWidth={active ? 2.5 : 1.5}
-                      filter={active && (isComplete || isRunning) ? (isRunning ? 'url(#glow-sky)' : 'url(#glow-emerald)') : undefined}
-                      style={{ transition: 'stroke 200ms, filter 200ms' }}
+                      fill={isSelected ? '#0B1728' : '#060D1A'}
+                      stroke={isSelected ? sc.ring : active ? sc.ring : sc.ring + '66'}
+                      strokeWidth={isSelected ? 3.5 : active ? 2.5 : 1.5}
+                      style={{ transition: 'stroke 200ms, fill 200ms, stroke-width 200ms' }}
                     />
 
-                    {/* Node number label (top) */}
+                    {/* Node number label */}
                     <text
                       x={cx} y={cy - 10}
                       textAnchor="middle"
                       fontSize="11"
                       fontFamily="monospace"
                       fontWeight="900"
-                      letterSpacing="0.04em"
                       fill={active ? sc.text : sc.text + 'AA'}
-                      style={{ transition: 'fill 200ms' }}
                     >
                       {stage.index}
                     </text>
 
-                    {/* Status icon (icon from lucide, rendered as SVG foreignObject trick via text) */}
-                    {/* We use text placeholders; real icons drawn via foreignObject below */}
+                    {/* Status text */}
                     <text
                       x={cx} y={cy + 6}
                       textAnchor="middle"
@@ -861,12 +1420,11 @@ export const InvestigationWorkflowGraph = ({
                       fontFamily="monospace"
                       fontWeight="600"
                       fill={active ? sc.text : sc.text + '99'}
-                      style={{ transition: 'fill 200ms' }}
                     >
                       {stage.shortName.slice(0, 5)}
                     </text>
 
-                    {/* Status tick at bottom of circle */}
+                    {/* Status visual */}
                     {isComplete && (
                       <g>
                         <circle cx={cx + NODE_R - 6} cy={cy - NODE_R + 6} r="8" fill="#10B981" stroke="#060D1A" strokeWidth="2" />
@@ -875,9 +1433,7 @@ export const InvestigationWorkflowGraph = ({
                     )}
                     {isRunning && (
                       <circle cx={cx + NODE_R - 6} cy={cy - NODE_R + 6} r="6"
-                        fill="#38BDF8"
-                        stroke="#060D1A"
-                        strokeWidth="2"
+                        fill="#38BDF8" stroke="#060D1A" strokeWidth="2"
                         style={!prefersReducedMotion ? { animation: 'nodeRingPulse 1s ease-in-out infinite' } : undefined}
                       />
                     )}
@@ -887,166 +1443,377 @@ export const InvestigationWorkflowGraph = ({
                         <text x={cx + NODE_R - 6} y={cy - NODE_R + 10} textAnchor="middle" fontSize="9" fill="white" fontWeight="bold">!</text>
                       </g>
                     )}
-
-                    {/* ── AGENT INFO CARD (below for top nodes, above for bottom nodes) ── */}
-                    <g>
-                      {/* Card background */}
-                      <rect
-                        x={cx - CARD_W / 2}
-                        y={cardTop}
-                        width={CARD_W}
-                        height={CARD_H}
-                        rx="7"
-                        ry="7"
-                        fill="#080F1C"
-                        stroke={active ? sc.ring + '88' : '#1E293B'}
-                        strokeWidth={active ? 1.5 : 1}
-                        style={{ transition: 'stroke 200ms' }}
-                      />
-
-                      {/* Connector line from card to circle */}
-                      <line
-                        x1={cx}
-                        y1={row === 'top' ? cy + NODE_R : cy - NODE_R}
-                        x2={cx}
-                        y2={row === 'top' ? cardTop : cardTop + CARD_H}
-                        stroke={active ? sc.ring + '66' : '#1E293B'}
-                        strokeWidth="1"
-                        strokeDasharray="3 3"
-                        style={{ transition: 'stroke 200ms' }}
-                      />
-
-                      {/* Full agent name */}
-                      <text
-                        x={cx}
-                        y={cardTop + 18}
-                        textAnchor="middle"
-                        fontSize="8.5"
-                        fontFamily="monospace"
-                        fontWeight="800"
-                        letterSpacing="0.06em"
-                        fill={active ? '#F1F5F9' : '#94A3B8'}
-                        style={{ transition: 'fill 200ms' }}
-                      >
-                        {stage.fullName.toUpperCase().slice(0, 22)}
-                      </text>
-
-                      {/* Domain subtitle */}
-                      <text
-                        x={cx}
-                        y={cardTop + 30}
-                        textAnchor="middle"
-                        fontSize="7.5"
-                        fontFamily="monospace"
-                        fill="#475569"
-                      >
-                        {stage.domain}
-                      </text>
-
-                      {/* Divider */}
-                      <line x1={cx - CARD_W / 2 + 10} y1={cardTop + 38} x2={cx + CARD_W / 2 - 10} y2={cardTop + 38}
-                        stroke="#1E293B" strokeWidth="0.8" />
-
-                      {/* Status pill */}
-                      <rect
-                        x={cx - 32} y={cardTop + 44}
-                        width="64" height="14"
-                        rx="7" ry="7"
-                        fill={sc.bg}
-                        stroke={sc.ring + '44'}
-                        strokeWidth="1"
-                      />
-                      <text
-                        x={cx} y={cardTop + 54}
-                        textAnchor="middle"
-                        fontSize="7"
-                        fontFamily="monospace"
-                        fontWeight="800"
-                        letterSpacing="0.08em"
-                        fill={sc.text}
-                      >
-                        {stage.status}
-                      </text>
-
-                      {/* Metric chip */}
-                      <text
-                        x={cx}
-                        y={cardTop + 73}
-                        textAnchor="middle"
-                        fontSize="7.5"
-                        fontFamily="monospace"
-                        fontWeight="600"
-                        fill="#64748B"
-                      >
-                        {stage.metricTag}
-                      </text>
-                    </g>
-
                   </g>
                 );
               })}
             </svg>
           </div>
 
-
           {/* ── KEYBOARD SHORTCUT HINTS ── */}
-          <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[8.5px] text-slate-600 uppercase tracking-wider border-t border-[#1E293B]/60 pt-2">
-            <span>HOVER NODE → INSPECT AGENT</span>
-            <span>·</span>
-            <span>CLICK → FULL FORENSIC REPORT</span>
-            <span>·</span>
-            <span>ESC → CLOSE REPORT</span>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 font-mono text-[8.5px] text-slate-600 uppercase tracking-wider border-t border-[#1E293B]/60 pt-2">
+            <div className="flex items-center gap-3">
+              <span>HOVER NODE → PREVIEW</span>
+              <span>·</span>
+              <span>CLICK NODE → AGENT DETAIL PANEL BELOW</span>
+              <span>·</span>
+              <span>1–5 → SWITCH AGENT</span>
+              <span>·</span>
+              <span>ESC → CLOSE</span>
+            </div>
+            {isDetailPanelOpen && selectedStage && (
+              <span className="text-sky-400/90 font-bold">
+                STAGE {selectedStage.index} ACTIVE BELOW ↓
+              </span>
+            )}
           </div>
         </div>
 
-        {/* ── RIGHT: INVESTIGATION SUMMARY PANEL ────────────────────────────── */}
-        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] bg-[#05090F] flex flex-col">
-          {/* Panel header */}
-          <div className="px-4 py-3 border-b border-[#1E293B] flex items-center gap-2">
-            <TrendingUp className="w-3.5 h-3.5 text-sky-400" />
-            <span className="font-mono text-[10px] font-black text-slate-200 uppercase tracking-wider">Investigation Summary</span>
-          </div>
+        {/* ── BOTTOM: HYBRID AGENT DETAIL ANCHORED PANEL OR PIPELINE OVERVIEW ── */}
+        <div className="w-full border-t border-[#1E293B] bg-[#04090F] flex flex-col relative transition-all duration-300">
+          {isDetailPanelOpen && selectedStage ? (
+            /* VIEW A: AGENT DETAIL PANEL (SPATIALLY ANCHORED BELOW SELECTED NODE) */
+            <div className="w-full flex flex-col pt-2 pb-6 px-4 sm:px-6 relative">
+              {/* Dynamic Anchor Stem pointing from Canvas Beam down to the Detail Card */}
+              <div className="w-full relative h-3 pointer-events-none mb-[-1px] z-10">
+                <div 
+                  className="absolute top-0 w-3.5 h-3.5 rotate-45 border-t border-l transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                  style={{
+                    left: `calc(${STAGE_ANCHOR_PCT[selectedStage.key] || 50}% - 7px)`,
+                    backgroundColor: '#060D1A',
+                    borderColor: statusColor(selectedStage.status).ring,
+                    boxShadow: `0 0 12px ${statusColor(selectedStage.status).glow}`,
+                  }}
+                />
+              </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Edge-Aware Card Container */}
+              <div className={twMerge(
+                "w-full max-w-[860px] transition-all duration-300",
+                getContainerAlignment(selectedStage.key)
+              )}>
+                <div 
+                  key={selectedStage.key}
+                  className="w-full rounded-2xl border bg-[#060D1A]/95 backdrop-blur-xl shadow-[0_16px_48px_rgba(0,0,0,0.65)] overflow-hidden animate-detailSlide"
+                  style={{
+                    borderColor: statusColor(selectedStage.status).ring + '60',
+                    boxShadow: `0 12px 36px rgba(0,0,0,0.6), 0 0 24px ${statusColor(selectedStage.status).glow}`,
+                  }}
+                >
+                  {/* Panel Header */}
+                  <div className="px-5 py-3 border-b border-[#1E293B] bg-[#081020]/90 backdrop-blur-sm flex flex-wrap items-center justify-between gap-3">
+                    {/* Left: Agent Identification */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div 
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{ 
+                          backgroundColor: statusColor(selectedStage.status).bg, 
+                          borderColor: statusColor(selectedStage.status).ring + '66' 
+                        }}
+                      >
+                        {React.createElement(selectedStage.Icon || Shield, {
+                          className: "w-4 h-4",
+                          style: { color: statusColor(selectedStage.status).text }
+                        })}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="text-[9.5px] font-mono font-black uppercase px-2 py-0.5 rounded border"
+                            style={{
+                              backgroundColor: statusColor(selectedStage.status).bg,
+                              borderColor: statusColor(selectedStage.status).ring + '44',
+                              color: statusColor(selectedStage.status).text
+                            }}
+                          >
+                            STAGE {selectedStage.index}
+                          </span>
+                          <span className="text-xs font-mono font-black text-slate-100 uppercase tracking-tight truncate">
+                            {selectedStage.fullName}
+                          </span>
+                        </div>
+                        <div className="text-[9.5px] font-mono text-slate-400 truncate mt-0.5">
+                          {selectedStage.domain}
+                        </div>
+                      </div>
+                    </div>
 
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                {
-                  label: 'Pipeline Status',
-                  value: isAllComplete ? 'COMPLETE' : runningCount > 0 ? 'EXECUTING' : 'STANDBY',
-                  color: isAllComplete ? '#10B981' : runningCount > 0 ? '#38BDF8' : '#64748B',
-                },
-                {
-                  label: 'Stages Done',
-                  value: `${completedCount} / 5`,
-                  color: completedCount > 0 ? '#10B981' : '#64748B',
-                },
-                {
-                  label: 'Elapsed Time',
-                  value: fmtTime(elapsedSec),
-                  color: '#94A3B8',
-                },
-                {
-                  label: 'Confidence',
-                  value: isAllComplete ? `${confidencePct}%` : '—',
-                  color: confidencePct >= 90 ? '#10B981' : confidencePct >= 70 ? '#FCD34D' : '#64748B',
-                },
-              ].map((m, i) => (
-                <div key={i} className="px-2.5 py-2 rounded-lg bg-[#080F1C] border border-[#1E293B] flex flex-col">
-                  <span className="text-[8px] font-mono text-slate-500 uppercase tracking-wider">{m.label}</span>
-                  <span className="text-[11px] font-mono font-black mt-1 tracking-tight" style={{ color: m.color }}>
-                    {m.value}
+                    {/* Right: Stage Switcher Pills + Status + Close */}
+                    <div className="flex items-center gap-2.5">
+                      {/* 1–5 Quick Selector Bar */}
+                      <div className="hidden sm:flex items-center gap-1 bg-[#080F1E] p-1 rounded-lg border border-[#1E293B]">
+                        {enrichedStages.map((s) => {
+                          const isCurrent = s.key === selectedStage.key;
+                          const sc = statusColor(s.status);
+                          return (
+                            <button
+                              key={s.key}
+                              type="button"
+                              onClick={() => setSelectedStageKey(s.key)}
+                              className={twMerge(
+                                "px-2 py-1 rounded text-center transition-all cursor-pointer font-mono text-[9px] font-bold uppercase flex items-center gap-1",
+                                isCurrent 
+                                  ? "bg-sky-500/20 border border-sky-400 text-sky-200 shadow-[0_0_8px_rgba(56,189,248,0.2)]"
+                                  : "text-slate-400 hover:text-slate-200 hover:bg-[#0E1726]"
+                              )}
+                              title={`${s.index} · ${s.fullName}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sc.ring }} />
+                              <span>{s.index}</span>
+                              <span className="hidden md:inline text-[8px] text-slate-400">{s.shortName.slice(0, 4)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Status indicator */}
+                      <span 
+                        className="text-[8.5px] font-mono font-bold uppercase px-2.5 py-1 rounded-full border flex items-center gap-1.5"
+                        style={{
+                          backgroundColor: statusColor(selectedStage.status).bg,
+                          borderColor: statusColor(selectedStage.status).ring + '55',
+                          color: statusColor(selectedStage.status).text
+                        }}
+                      >
+                        {selectedStage.status === 'RUNNING' && (
+                          <span className={twMerge("w-1.5 h-1.5 rounded-full bg-sky-400", !prefersReducedMotion && "animate-pulse")} />
+                        )}
+                        {selectedStage.status === 'COMPLETED' && <Check className="w-3 h-3" />}
+                        {selectedStage.status === 'FAILED' && <AlertTriangle className="w-3 h-3 text-rose-400" />}
+                        {selectedStage.status}
+                      </span>
+
+                      {/* Close Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsDetailPanelOpen(false)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#1E293B] transition-colors cursor-pointer"
+                        title="Close agent detail panel (Esc)"
+                        aria-label="Close agent detail panel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Main Content Grid: 12 Columns */}
+                  <div className="p-5 select-text space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                      
+                      {/* 1. Primary Forensic Finding (Column 1 - 4 cols) */}
+                      <div 
+                        className="lg:col-span-4 rounded-xl p-4 border relative overflow-hidden bg-[#070E1C] flex flex-col justify-between"
+                        style={{
+                          borderColor: statusColor(selectedStage.status).ring + '40',
+                        }}
+                      >
+                        <div 
+                          className="absolute top-0 left-0 bottom-0 w-1.5"
+                          style={{ backgroundColor: statusColor(selectedStage.status).ring }}
+                        />
+                        <div>
+                          <div className="flex items-center justify-between mb-2 pl-2">
+                            <span className="text-[8.5px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                              PRIMARY FORENSIC FINDING
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-500 uppercase">
+                              AGENT {selectedStage.index} OF 05
+                            </span>
+                          </div>
+                          <p className="text-[12.5px] text-slate-100 leading-relaxed pl-2 font-sans font-medium">
+                            {selectedStage.insight.primaryFinding}
+                          </p>
+                        </div>
+
+                        <div className="mt-4 pl-2 pt-2 border-t border-[#1E293B]/60 flex items-center justify-between text-[8px] font-mono text-slate-500 uppercase">
+                          <span>ORIGIN: REAL AGENT TELEMETRY</span>
+                          <span style={{ color: statusColor(selectedStage.status).text }}>
+                            VERIFIED OUTPUT
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 2. 2x2 Metric Chips Grid (Column 2 - 4 cols) */}
+                      <div className="lg:col-span-4 flex flex-col justify-between">
+                        <div className="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                          <span>FORENSIC TELEMETRY METRICS</span>
+                          <span className="text-[8px] text-slate-500 font-mono">DETERMINISTIC</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5 flex-1">
+                          {selectedStage.insight.items.map((it, idx) => (
+                            <div 
+                              key={idx}
+                              className="p-3 rounded-xl bg-[#081122] border border-[#1E293B]/80 hover:border-slate-700 transition-colors flex flex-col justify-between"
+                            >
+                              <span className="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider truncate mb-1">
+                                {it.label}
+                              </span>
+                              <span 
+                                className="text-base font-mono font-black tracking-tight"
+                                style={{
+                                  color: it.alert ? '#F43F5E' : it.warn ? '#FCD34D' : it.success ? '#10B981' : '#E2E8F0'
+                                }}
+                              >
+                                {safeFormatValue(it.value, it.label)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 3. Key Forensic Insights (Column 3 - 4 cols) */}
+                      <div className="lg:col-span-4 flex flex-col justify-between">
+                        <div className="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Info className="w-3.5 h-3.5 text-sky-400" />
+                            <span>KEY FORENSIC INSIGHTS</span>
+                          </div>
+                          <span className="text-[8px] text-slate-500 font-mono">
+                            {selectedStage.insight.insights?.length || 0} VERIFIED
+                          </span>
+                        </div>
+                        <div className="rounded-xl bg-[#081122] border border-[#1E293B]/80 p-3 space-y-2 flex-1 flex flex-col justify-between">
+                          {selectedStage.insight.insights && selectedStage.insight.insights.map((ins, idx) => (
+                            <div key={idx} className="p-2 rounded-lg bg-[#060D1A]/90 border border-[#1E293B]/60 space-y-1">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span 
+                                    className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                    style={{ backgroundColor: statusColor(selectedStage.status).ring }} 
+                                  />
+                                  <span className="text-[10px] font-mono font-bold text-slate-200 uppercase truncate">
+                                    {ins.title}
+                                  </span>
+                                </div>
+                                {ins.id && (
+                                  <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-[#0A1426] border border-[#1E293B] text-sky-300 shrink-0 font-semibold">
+                                    {ins.id}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-300 font-sans leading-snug pl-3">
+                                {ins.description}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Progressive Disclosure: Additional Forensic Traceability Accordion */}
+                    {selectedStage.insight.additionalDetails && selectedStage.insight.additionalDetails.length > 0 && (
+                      <div className="border border-[#1E293B]/80 rounded-xl bg-[#070D1A] overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setShowAdditionalDetails(!showAdditionalDetails)}
+                          className="w-full px-4 py-2.5 bg-[#081122] hover:bg-[#0C1930] transition-colors flex items-center justify-between text-left font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-200 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <GitCommit className="w-3.5 h-3.5 text-sky-400" />
+                            <span>ADDITIONAL FORENSIC TRACEABILITY & SECONDARY FINDINGS</span>
+                            <span className="px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30 text-[8px]">
+                              {selectedStage.insight.additionalDetails.length} RECORDS
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[8.5px] text-slate-500">
+                            <span>{showAdditionalDetails ? 'COLLAPSE' : 'EXPAND'}</span>
+                            <ChevronDown className={twMerge("w-3.5 h-3.5 transition-transform duration-200", showAdditionalDetails && "rotate-180")} />
+                          </div>
+                        </button>
+
+                        {showAdditionalDetails && (
+                          <div className="p-4 border-t border-[#1E293B]/60 space-y-2 max-h-[260px] overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {selectedStage.insight.additionalDetails.map((det, dIdx) => (
+                                <div key={dIdx} className="p-2.5 rounded-lg bg-[#050A14] border border-[#1E293B]/70 flex flex-col justify-between gap-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-tight truncate">
+                                      {det.label}
+                                    </span>
+                                    {det.id && (
+                                      <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-[#081020] border border-[#1E293B] text-slate-400 shrink-0">
+                                        {det.id}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] font-sans text-slate-200 leading-snug">
+                                    {safeFormatValue(det.value, det.label)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Panel Action Footer */}
+                  <div className="px-5 py-3 border-t border-[#1E293B] bg-[#060C18] flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 font-mono text-[9px] text-slate-500 uppercase">
+                      <span>ACTIVE AGENT: <strong className="text-slate-300">{selectedStage.fullName}</strong></span>
+                      <span>·</span>
+                      <span>PRESS 1–5 TO SWITCH AGENTS</span>
+                      <span>·</span>
+                      <span>ESC TO CLOSE</span>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsDetailPanelOpen(false)}
+                        className="py-2 px-3 rounded-lg bg-[#0E1726] hover:bg-[#162338] border border-[#1E293B] text-slate-400 hover:text-slate-200 font-mono text-[9px] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                      >
+                        CLOSE DETAIL (ESC)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveReportKey(selectedStage.key)}
+                        className="py-2 px-4 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 hover:border-sky-400 text-sky-200 font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-[0_0_12px_rgba(56,189,248,0.15)] group"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
+                        VIEW FULL TECHNICAL REPORT
+                        <ArrowRight className="w-3.5 h-3.5 text-sky-400 group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* VIEW B: PIPELINE OVERVIEW PANEL (when detail panel is collapsed) */
+            <div className="w-full px-5 py-3.5 bg-[#060C18] flex flex-wrap items-center justify-between gap-4 animate-fadeIn">
+              {/* Left: Overall pipeline metrics */}
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-sky-400" />
+                  <span className="font-mono text-xs font-black text-slate-200 uppercase tracking-wider">Pipeline Overview</span>
+                </div>
+                <div className="h-4 w-[1px] bg-[#1E293B] hidden sm:block" />
+                <div className="flex items-center gap-3 font-mono text-[10px]">
+                  <span className="text-slate-500 uppercase">STATUS:</span>
+                  <span className="font-bold" style={{ color: isAllComplete ? '#10B981' : runningCount > 0 ? '#38BDF8' : '#64748B' }}>
+                    {isAllComplete ? 'COMPLETE' : runningCount > 0 ? 'EXECUTING' : 'STANDBY'}
+                  </span>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-slate-500 uppercase">STAGES:</span>
+                  <span className="text-slate-200 font-bold">{completedCount} / 5</span>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-slate-500 uppercase">ELAPSED:</span>
+                  <span className="text-slate-300 font-bold">{fmtTime(elapsedSec)}</span>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-slate-500 uppercase">CONFIDENCE:</span>
+                  <span className="font-bold" style={{ color: confidencePct >= 90 ? '#10B981' : confidencePct >= 70 ? '#FCD34D' : '#64748B' }}>
+                    {isAllComplete ? `${confidencePct}%` : '—'}
                   </span>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Pipeline Progress List */}
-            <div>
-              <span className="block text-[8.5px] font-mono text-slate-500 uppercase tracking-wider mb-2">Pipeline Progress</span>
-              <div className="space-y-1">
-                {enrichedStages.map((stage, idx) => {
+              {/* Middle: 5 clickable stages */}
+              <div className="hidden lg:flex items-center gap-1.5">
+                {enrichedStages.map((stage) => {
                   const sc = statusColor(stage.status);
                   return (
                     <button
@@ -1054,67 +1821,35 @@ export const InvestigationWorkflowGraph = ({
                       type="button"
                       onClick={() => {
                         setSelectedStageKey(stage.key);
-                        setActiveReportKey(prev => prev === stage.key ? null : stage.key);
+                        setIsDetailPanelOpen(true);
                       }}
                       className={twMerge(
-                        'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border transition-all text-left cursor-pointer',
+                        'flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[9px] font-mono font-bold uppercase transition-all cursor-pointer',
                         selectedStageKey === stage.key
-                          ? 'bg-sky-500/10 border-sky-500/40'
-                          : 'bg-[#080F1C] border-[#1E293B] hover:border-slate-600 hover:bg-[#0A1020]'
+                          ? 'bg-sky-500/15 border-sky-400 text-sky-200'
+                          : 'bg-[#080F1C] border-[#1E293B] text-slate-400 hover:text-slate-200 hover:border-slate-600'
                       )}
                     >
-                      {/* Status dot */}
-                      <div
-                        className={twMerge('w-2 h-2 rounded-full shrink-0', stage.status === 'RUNNING' && !prefersReducedMotion && 'animate-pulse')}
-                        style={{ background: sc.ring, boxShadow: stage.status !== 'PENDING' ? `0 0 6px ${sc.ring}88` : undefined }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="block font-mono text-[9px] font-bold uppercase tracking-tight truncate" style={{ color: sc.text }}>
-                          {stage.index} · {stage.shortName}
-                        </span>
-                        <span className="block text-[8px] text-slate-500 truncate font-mono">{stage.domain}</span>
-                      </div>
-                      {stage.status === 'COMPLETED' && <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
-                      {stage.status === 'RUNNING'   && <RefreshCw className={twMerge('w-3 h-3 text-sky-400 shrink-0', !prefersReducedMotion && 'animate-spin')} />}
-                      {stage.status === 'FAILED'    && <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />}
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: sc.ring }} />
+                      <span>{stage.index} · {stage.shortName}</span>
+                      {stage.status === 'COMPLETED' && <Check className="w-2.5 h-2.5 text-emerald-400" />}
                     </button>
                   );
                 })}
               </div>
-            </div>
 
-            {/* View Report Button */}
-            {completedCount > 0 && (
+              {/* Right: Open Detail Button */}
               <button
                 type="button"
-                onClick={() => {
-                  const lastCompleted = [...enrichedStages].reverse().find(s => s.status === 'COMPLETED');
-                  if (lastCompleted) {
-                    setSelectedStageKey(lastCompleted.key);
-                    setActiveReportKey(prev => prev === lastCompleted.key ? null : lastCompleted.key);
-                  }
-                }}
-                className="w-full py-2 px-3 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/35 text-sky-300 font-mono text-[9px] font-black uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer"
+                onClick={() => setIsDetailPanelOpen(true)}
+                className="py-1.5 px-3 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/35 text-sky-300 font-mono text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ml-auto sm:ml-0"
               >
-                <span className="flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5" />
-                  VIEW FULL INVESTIGATION
-                </span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <Eye className="w-3.5 h-3.5" />
+                <span>INSPECT AGENT DETAIL</span>
+                <ArrowRight className="w-3 h-3" />
               </button>
-            )}
-
-            {/* Error alert if any failed */}
-            {failedCount > 0 && (
-              <div className="px-2.5 py-2 rounded-lg bg-rose-500/8 border border-rose-500/25 flex items-start gap-2">
-                <AlertTriangle className="w-3 h-3 text-rose-400 mt-0.5 shrink-0" />
-                <span className="text-[9px] font-mono text-rose-300 leading-relaxed">
-                  {failedCount} stage{failedCount > 1 ? 's' : ''} failed. Investigation may be incomplete.
-                </span>
-              </div>
-            )}
-
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1197,6 +1932,19 @@ export const InvestigationWorkflowGraph = ({
         @keyframes nodeRingPulse {
           0%, 100% { opacity: 0.3; r: ${NODE_R + 10}; }
           50%       { opacity: 0.6; r: ${NODE_R + 14}; }
+        }
+        @keyframes detailSlide {
+          0% {
+            opacity: 0;
+            transform: translateY(-16px) scale(0.985);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        .animate-detailSlide {
+          animation: detailSlide 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(6px); }

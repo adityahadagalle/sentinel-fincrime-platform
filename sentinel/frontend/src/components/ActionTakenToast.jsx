@@ -4,6 +4,7 @@ import { ShieldAlert, AlertTriangle, Activity, Lock, CheckCircle2, XCircle, Zap,
 const ActionTakenToast = () => {
   const [activeAction, setActiveAction] = useState(null);
   const timerRef = useRef(null);
+  const seenActionsRef = useRef(new Map());
 
   useEffect(() => {
     const handleAction = (event) => {
@@ -17,14 +18,13 @@ const ActionTakenToast = () => {
       
       const execStatus = data.execution_status || data.action_status || rec.execution_status || rec.action_status || 'NOT_EXECUTED';
       const mode = rec.automation_mode || rec.mode || data.mode || (pol.automation_enabled ? 'AUTOMATE_ON' : 'AUTOMATE_OFF');
-      const rawAction = (data.action || data.action_code || rec.action_code || rec.action || pol.action || 'MONITOR').toUpperCase();
+      const rawAction = (data.action || data.action_code || rec.action_code || rec.action || pol.action || '').toUpperCase();
       const isFreeze = rawAction === 'FREEZE';
       const actorType = data.actor_type || rec.actor_type || (isFreeze ? 'HUMAN_OPERATOR' : 'AUTOMATION_ENGINE');
       const isHumanOperator = actorType === 'HUMAN_OPERATOR';
       
       const isFailedFreeze = event.type === 'sentinel_freeze_failed' || data.is_failed_freeze;
       const isOperatorReq = !isFailedFreeze && (execStatus === 'REQUIRES_OPERATOR_ACTION' || (isFreeze && !isHumanOperator));
-      const isModeOff = !isFailedFreeze && (mode === 'AUTOMATE_OFF' || execStatus === 'NOT_EXECUTED') && !isOperatorReq && !isHumanOperator;
       const isBlocked = !isFailedFreeze && (execStatus === 'REJECTED' || pol.decision === 'REJECT');
       const isFailed = isFailedFreeze || execStatus === 'FAILED';
       const isExecuted = !isFailedFreeze && (execStatus === 'SUCCESS' || execStatus === 'EXECUTED') && !isFreeze;
@@ -35,36 +35,60 @@ const ActionTakenToast = () => {
         return;
       }
 
-      let title = '⚡ AUTOMATED ACTION EXECUTED';
+      // Routine MONITOR is baseline telemetry, NOT an enforcement popup event
+      if (rawAction === 'MONITOR' || rawAction === '') {
+        return;
+      }
+
+      // Suppress toast if no meaningful action lifecycle event occurred
+      if (!isOperatorReq && !isFailed && !isBlocked && !isExecuted) {
+        return;
+      }
+
+      const txId = data.transaction_id || data.tx_id || rec.transaction_id || 'UNKNOWN';
+      const now = Date.now();
+      const dedupeKey = `${txId}_${rawAction}_${execStatus}`;
+
+      // Deduplicate: suppress repeated duplicate action toasts within 5s
+      if (txId !== 'UNKNOWN') {
+        const lastSeen = seenActionsRef.current.get(dedupeKey);
+        if (lastSeen && now - lastSeen < 5000) {
+          return;
+        }
+        seenActionsRef.current.set(dedupeKey, now);
+        if (seenActionsRef.current.size > 100) {
+          for (const [k, v] of seenActionsRef.current.entries()) {
+            if (now - v > 30000) seenActionsRef.current.delete(k);
+          }
+        }
+      }
+
+      let title = isHumanOperator ? '⚡ OPERATOR ACTION EXECUTED' : '⚡ AUTOMATED ACTION EXECUTED';
       if (isOperatorReq) {
         title = '🔔 OPERATOR ACTION REQUIRED';
-      } else if (isModeOff) {
-        title = '○ AUTOMATION OFF';
       } else if (isFailedFreeze || isFailed) {
         title = '⚠ FREEZE FAILED';
       } else if (isBlocked) {
         title = '🔒 ACTION BLOCKED BY POLICY';
       }
 
-      const duration = (isFailedFreeze || isFailed) ? 4000 : 1800;
-
+      const duration = (isFailedFreeze || isFailed) ? 4000 : 2500;
 
       const newAction = {
-        id: Math.random().toString(36).substring(2, 9),
-        tx_id: data.transaction_id || data.tx_id || rec.transaction_id || 'UNKNOWN',
+        id: dedupeKey,
+        tx_id: txId,
         account_id: data.account_id || data.sender_account || rec.account_id || 'ACC-XXXX',
         score,
         risk_level,
         action: isFreeze ? 'FREEZE ACCOUNT' : rawAction.replace(/_/g, ' '),
-        action_status: isOperatorFreezeExecuted ? 'SUCCESS' : isFailedFreeze ? 'NOT FROZEN' : isOperatorReq ? 'Awaiting operator approval' : isModeOff ? 'NOT EXECUTED' : execStatus,
+        action_status: isOperatorFreezeExecuted ? 'SUCCESS' : isFailedFreeze ? 'NOT FROZEN' : isOperatorReq ? 'Awaiting operator approval' : execStatus,
         mode,
         actor_type: isOperatorFreezeExecuted ? 'HUMAN OPERATOR' : isOperatorReq ? 'HUMAN OPERATOR' : 'AUTOMATION ENGINE',
         policy_rule_id: pol.policy_rule_id || rec.policy_rule_id || 'POL-DEFAULT',
-        reason: data.error || pol.reason || data.reason || rec.reason || (isModeOff ? 'Automation is OFF' : 'Deterministic policy engine evaluation.'),
+        reason: data.error || pol.reason || data.reason || rec.reason || 'Deterministic policy engine evaluation.',
         title,
         isOperatorReq,
         isOperatorFreezeExecuted,
-        isModeOff,
         isBlocked,
         isFailed: isFailedFreeze || isFailed,
         isExecuted,
@@ -104,8 +128,6 @@ const ActionTakenToast = () => {
             ? 'bg-rose-950/95 border-rose-500/90 text-rose-200 shadow-rose-950/80'
             : activeAction.isOperatorReq
             ? 'bg-amber-950/95 border-amber-500/90 text-amber-200 shadow-amber-950/80 animate-pulse'
-            : activeAction.isModeOff
-            ? 'bg-slate-950/95 border-slate-700/80 text-slate-300 shadow-slate-950/60'
             : activeAction.isFailed
             ? 'bg-rose-950/95 border-rose-500/80 text-rose-200 shadow-rose-950/60'
             : 'bg-slate-950/95 border-emerald-500/60 text-emerald-300 shadow-emerald-950/40'
@@ -120,8 +142,6 @@ const ActionTakenToast = () => {
                   ? 'bg-rose-500/25 text-rose-300'
                   : activeAction.isOperatorReq
                   ? 'bg-amber-500/25 text-amber-300'
-                  : activeAction.isModeOff
-                  ? 'bg-slate-800 text-slate-400'
                   : activeAction.isFailed
                   ? 'bg-rose-500/20 text-rose-400'
                   : 'bg-emerald-500/20 text-emerald-400'
@@ -131,8 +151,6 @@ const ActionTakenToast = () => {
                 <Lock className="w-4 h-4 text-rose-300" />
               ) : activeAction.isOperatorReq ? (
                 <AlertTriangle className="w-4 h-4 text-amber-300 animate-pulse" />
-              ) : activeAction.isModeOff ? (
-                <MinusCircle className="w-4 h-4 text-slate-400" />
               ) : activeAction.isFailed ? (
                 <XCircle className="w-4 h-4 text-rose-400" />
               ) : (
@@ -199,12 +217,6 @@ const ActionTakenToast = () => {
           {activeAction.isOperatorReq && (
             <div className="p-2 bg-amber-900/40 border border-amber-500/30 rounded-lg text-[11px] font-mono text-amber-200">
               Operator Approval Required. Click FREEZE control on transaction feed to execute.
-            </div>
-          )}
-
-          {activeAction.isModeOff && (
-            <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-300">
-              Automation is OFF. No action executed.
             </div>
           )}
 

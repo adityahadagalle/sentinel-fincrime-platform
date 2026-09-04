@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bot, ShieldAlert, CheckCircle2, Lock, X, AlertTriangle } from 'lucide-react';
 
 const AutomateModeToggle = () => {
   const [automateMode, setAutomateMode] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userFeedback, setUserFeedback] = useState(null);
+  const feedbackTimerRef = useRef(null);
 
   // Fetch initial mode state from backend
   useEffect(() => {
@@ -28,6 +30,7 @@ const AutomateModeToggle = () => {
     window.addEventListener('sentinel_automation_mode_changed', handleModeChange);
     return () => {
       window.removeEventListener('sentinel_automation_mode_changed', handleModeChange);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     };
   }, []);
 
@@ -60,6 +63,14 @@ const AutomateModeToggle = () => {
       if (data.status === 'success') {
         setAutomateMode(enabled);
         window.dispatchEvent(new CustomEvent('sentinel_automation_mode_changed', { detail: { automate_mode: enabled } }));
+
+        // Minimal confirmation feedback strictly for explicit user action
+        if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+        setUserFeedback(enabled ? 'ON' : 'OFF');
+        feedbackTimerRef.current = setTimeout(() => {
+          setUserFeedback(null);
+          feedbackTimerRef.current = null;
+        }, 1800);
       }
     } catch (err) {
       console.error('Failed to update automation mode:', err);
@@ -73,7 +84,7 @@ const AutomateModeToggle = () => {
   return (
     <>
       {/* Global Control Button */}
-      <div className="flex items-center gap-2">
+      <div className="space-y-1.5">
         <button
           type="button"
           onClick={handleToggleClick}
@@ -99,6 +110,23 @@ const AutomateModeToggle = () => {
             {automateMode ? 'ON' : 'OFF'}
           </span>
         </button>
+
+        {/* Explicit User Action Confirmation Pill */}
+        {userFeedback && (
+          <div
+            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold animate-in fade-in slide-in-from-top-1 duration-150 border select-none ${
+              userFeedback === 'ON'
+                ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-950/40'
+                : 'bg-slate-900/90 border-slate-700/80 text-slate-300 shadow-sm shadow-slate-950/40'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className={`w-3.5 h-3.5 ${userFeedback === 'ON' ? 'text-emerald-400' : 'text-slate-400'}`} />
+              Automation Mode: {userFeedback}
+            </span>
+            <span className="text-[9px] text-slate-500 uppercase font-sans">Updated</span>
+          </div>
+        )}
       </div>
 
 

@@ -57,14 +57,14 @@ const App = () => {
 
   return (
     <Router>
-      <div className="flex min-h-screen bg-background text-foreground relative font-sans antialiased overflow-hidden">
+      <div className="flex h-screen w-screen bg-background text-foreground relative font-sans antialiased overflow-hidden">
         <LiveAlertToast />
         <ActionTakenToast />
 
         
         {/* Navigation Sidebar */}
-        <aside className="w-64 border-r border-border bg-card flex flex-col justify-between shrink-0 select-none z-20 shadow-xl">
-          <div className="p-5 space-y-6">
+        <aside className="w-64 h-full border-r border-border bg-card flex flex-col shrink-0 select-none z-20 shadow-xl overflow-hidden">
+          <div className="p-5 space-y-6 flex-1 overflow-y-auto">
             {/* Header & Logo */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-3">
@@ -142,10 +142,12 @@ const App = () => {
           </div>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-border/80 space-y-3 bg-card/50">
+          <div className="p-4 border-t border-border/80 space-y-3 bg-card/50 shrink-0 mt-auto">
             <button 
+              type="button"
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-muted/50 hover:bg-muted text-slate-300 hover:text-slate-100 text-xs font-medium transition-all duration-150 border border-border/50"
+              aria-label="Logout System"
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-muted/50 hover:bg-muted text-slate-300 hover:text-slate-100 text-xs font-medium transition-all duration-150 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Logout System</span>
@@ -161,8 +163,8 @@ const App = () => {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-hidden bg-background flex flex-col h-full">
-          <div className="flex-1 h-full overflow-hidden">
+        <main className="flex-1 h-full min-w-0 bg-background flex flex-col overflow-hidden relative">
+          <div className="flex-1 h-full min-h-0 overflow-y-auto">
             <Routes>
               <Route path="/" element={<Navigate to="/feed" replace />} />
               <Route path="/feed" element={<Feed />} />

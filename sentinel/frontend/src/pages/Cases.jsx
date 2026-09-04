@@ -169,7 +169,7 @@ const Cases = () => {
   };
 
   return (
-    <div className="p-8 bg-background min-h-screen font-sans">
+    <div className="p-8 bg-background min-h-full font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Page Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
