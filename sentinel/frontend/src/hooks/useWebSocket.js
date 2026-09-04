@@ -180,13 +180,16 @@ const handleEvent = (payload = {}) => {
   }
 
   if (type === EVENT_TYPES.TRANSACTION_ACTION || type === 'transaction.action') {
+    const rawStatus = String(payload.action_status || payload.execution_status || '').toUpperCase();
+    const isSuccess = rawStatus === 'SUCCESS' || rawStatus === 'COMPLETED' || rawStatus === 'EXECUTED';
+
     const actionPayload = {
       transaction_id: payload.transaction_id || payload.tx_id || '',
       tx_id: payload.tx_id || payload.transaction_id || '',
       risk_score: Number(payload.risk_score || 0),
       risk_level: payload.risk_level || 'LOW',
       action: payload.action || 'MONITOR',
-      action_status: payload.action_status || 'COMPLETED',
+      action_status: payload.action_status || (isSuccess ? 'SUCCESS' : 'NOT_EXECUTED'),
       reason: payload.reason || '',
       automated: payload.automated !== undefined ? payload.automated : true,
       requires_human_approval: Boolean(payload.requires_human_approval),
@@ -209,10 +212,11 @@ const handleEvent = (payload = {}) => {
         }
         return t;
       });
+      const nextActions = isSuccess ? [actionPayload, ...prev.actions] : prev.actions;
       return {
         ...prev,
         transactions: updatedTxList,
-        actions: [actionPayload, ...prev.actions]
+        actions: nextActions
       };
     });
     window.dispatchEvent(new CustomEvent('sentinel_transaction_action', { detail: actionPayload }));
