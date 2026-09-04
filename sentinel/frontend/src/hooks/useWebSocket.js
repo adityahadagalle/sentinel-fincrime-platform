@@ -22,6 +22,12 @@ let reconnectDelay = 1500;
 let started = false;
 let pollingFailures = 0;
 
+// Lifecycle guards to eliminate alert flood on connection & duplicate dispatch
+let isHydrating = false;
+let hydrationTimer = null;
+const seenTxIds = new Set();
+const seenActionEvents = new Map();
+
 const notify = () => {
   listeners.forEach((listener) => listener(store));
 };
@@ -154,8 +160,34 @@ const scheduleReconnect = () => {
 
 const handleEvent = (payload = {}) => {
   const type = payload.event;
+
+  if (type === 'connected') {
+    isHydrating = true;
+    if (hydrationTimer) clearTimeout(hydrationTimer);
+    hydrationTimer = setTimeout(() => {
+      isHydrating = false;
+    }, 800);
+    return;
+  }
+
   if (type === EVENT_TYPES.TX_SCORED) {
     const incoming = normalizeTransaction(payload);
+    const txId = incoming.tx_id;
+    const isDuplicate = seenTxIds.has(txId);
+    seenTxIds.add(txId);
+    if (seenTxIds.size > 1000) {
+      const it = seenTxIds.values();
+      for (let i = 0; i < 200; i++) seenTxIds.delete(it.next().value);
+    }
+
+    // Refresh hydration settling timer while receiving initial burst
+    if (isHydrating) {
+      if (hydrationTimer) clearTimeout(hydrationTimer);
+      hydrationTimer = setTimeout(() => {
+        isHydrating = false;
+      }, 500);
+    }
+
     setStore((prev) => {
       const exists = prev.transactions.some((tx) => tx.tx_id === incoming.tx_id);
       if (exists) return prev;
@@ -165,10 +197,19 @@ const handleEvent = (payload = {}) => {
         lastTxEvent: incoming
       };
     });
-    window.dispatchEvent(new CustomEvent('sentinel_alert', { detail: incoming }));
+
+    const txAge = incoming.timestamp ? (Date.now() - new Date(incoming.timestamp).getTime()) : 0;
+    const isRecent = !incoming.timestamp || isNaN(txAge) || txAge < 30000;
+
+    // Only dispatch live alert if:
+    // 1. Not during connection hydration replay
+    // 2. Transaction has not already been seen / alerted
+    // 3. Transaction timestamp is fresh (< 30s)
+    if (!isHydrating && !isDuplicate && isRecent) {
+      window.dispatchEvent(new CustomEvent('sentinel_alert', { detail: incoming }));
+    }
     return;
   }
-
 
   if (type === EVENT_TYPES.CASE_UPDATED) {
     if (!validateCasePayload(payload)) return;
@@ -219,7 +260,19 @@ const handleEvent = (payload = {}) => {
         actions: nextActions
       };
     });
-    window.dispatchEvent(new CustomEvent('sentinel_transaction_action', { detail: actionPayload }));
+
+    const actionKey = `${actionPayload.tx_id}_${actionPayload.action}_${actionPayload.action_status}`;
+    const now = Date.now();
+    const lastDispatched = seenActionEvents.get(actionKey);
+    if (!lastDispatched || now - lastDispatched > 3000) {
+      seenActionEvents.set(actionKey, now);
+      if (seenActionEvents.size > 200) {
+        for (const [k, v] of seenActionEvents.entries()) {
+          if (now - v > 30000) seenActionEvents.delete(k);
+        }
+      }
+      window.dispatchEvent(new CustomEvent('sentinel_transaction_action', { detail: actionPayload }));
+    }
     return;
   }
 
@@ -264,11 +317,23 @@ const handleEvent = (payload = {}) => {
         };
       });
     }
-    window.dispatchEvent(new CustomEvent('sentinel_automation_action', { detail: payload }));
+
+    const actionCode = payload.action_code || execRec.action_code || payload.action || '';
+    const execStatus = payload.execution_status || execRec.execution_status || '';
+    const actionKey = `${txId}_${actionCode}_${execStatus}`;
+    const now = Date.now();
+    const lastDispatched = seenActionEvents.get(actionKey);
+    if (!lastDispatched || now - lastDispatched > 3000) {
+      seenActionEvents.set(actionKey, now);
+      if (seenActionEvents.size > 200) {
+        for (const [k, v] of seenActionEvents.entries()) {
+          if (now - v > 30000) seenActionEvents.delete(k);
+        }
+      }
+      window.dispatchEvent(new CustomEvent('sentinel_automation_action', { detail: payload }));
+    }
     return;
   }
-
-
 
   if (type === EVENT_TYPES.ACTION_TAKEN) {
     const incoming = normalizeAction(payload);
@@ -284,9 +349,9 @@ const handleEvent = (payload = {}) => {
   }
 };
 
-
 const connectWS = () => {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  isHydrating = true;
   ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
@@ -305,6 +370,11 @@ const connectWS = () => {
 
   ws.onclose = () => {
     ws = null;
+    isHydrating = false;
+    if (hydrationTimer) {
+      clearTimeout(hydrationTimer);
+      hydrationTimer = null;
+    }
     startPolling();
     scheduleReconnect();
   };
@@ -333,6 +403,11 @@ const stopRealtime = () => {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  if (hydrationTimer) {
+    clearTimeout(hydrationTimer);
+    hydrationTimer = null;
+  }
+  isHydrating = false;
   stopPolling();
   started = false;
   reconnectDelay = 1500;

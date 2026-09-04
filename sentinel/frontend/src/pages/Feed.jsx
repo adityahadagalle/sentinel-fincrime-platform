@@ -278,7 +278,7 @@ const Feed = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden font-sans">
+    <div className="flex flex-col h-full bg-background overflow-hidden font-sans">
 
       {/* ══════ 1. TOP HEADER / KPI BAR (EXACT FRIEND'S DESIGN) ══════ */}
       <header className="px-8 py-5 border-b border-border/80 bg-card/60 backdrop-blur-md shrink-0">

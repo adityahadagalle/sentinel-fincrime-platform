@@ -1922,17 +1922,34 @@ async def get_analytics_overview(
     if not risk_trend:
         risk_trend = []
 
-    # 2. Alerts by Risk Level
-    crit_count = sum(1 for t in tx_list if float(t.get("risk_score", 0)) >= 85)
-    high_count = sum(1 for t in tx_list if 70 <= float(t.get("risk_score", 0)) < 85)
-    med_count = sum(1 for t in tx_list if 40 <= float(t.get("risk_score", 0)) < 70)
-    low_count = sum(1 for t in tx_list if float(t.get("risk_score", 0)) < 40)
+    # 2. Alerts by Risk Level (Authenticated Forensic Grouping)
+    crit_txs = [t for t in tx_list if float(t.get("risk_score", 0)) >= 85]
+    high_txs = [t for t in tx_list if 70 <= float(t.get("risk_score", 0)) < 85]
+    med_txs = [t for t in tx_list if 40 <= float(t.get("risk_score", 0)) < 70]
+    low_txs = [t for t in tx_list if float(t.get("risk_score", 0)) < 40]
+
+    def _build_tier_summary(txs, name, color, threshold_desc, guidance):
+        cnt = len(txs)
+        pct = round((cnt / max(total_tx, 1)) * 100, 1)
+        vol = round(sum(float(t.get("amount", 0)) for t in txs), 2)
+        scores = [float(t.get("risk_score", 0)) for t in txs]
+        avg_s = round(sum(scores) / len(scores), 1) if scores else 0.0
+        return {
+            "name": name,
+            "value": cnt,
+            "color": color,
+            "percentage": pct,
+            "volume": vol,
+            "avg_score": avg_s,
+            "threshold": threshold_desc,
+            "guidance": guidance
+        }
 
     alerts_by_risk_level = [
-        {"name": "CRITICAL", "value": crit_count, "color": "#ef4444", "percentage": round((crit_count/max(total_tx, 1))*100, 1)},
-        {"name": "HIGH", "value": high_count, "color": "#f59e0b", "percentage": round((high_count/max(total_tx, 1))*100, 1)},
-        {"name": "MEDIUM", "value": med_count, "color": "#38bdf8", "percentage": round((med_count/max(total_tx, 1))*100, 1)},
-        {"name": "LOW", "value": low_count, "color": "#10b981", "percentage": round((low_count/max(total_tx, 1))*100, 1)}
+        _build_tier_summary(crit_txs, "CRITICAL", "#ef4444", "Score ≥ 85", "Immediate automated block or hard freeze"),
+        _build_tier_summary(high_txs, "HIGH", "#f59e0b", "Score 70–84", "Enhanced monitoring and analyst escalation"),
+        _build_tier_summary(med_txs, "MEDIUM", "#38bdf8", "Score 40–69", "Automated telemetry and rule screening"),
+        _build_tier_summary(low_txs, "LOW", "#10b981", "Score < 40", "Normal baseline transaction routing")
     ]
 
     # 3. Investigation Performance

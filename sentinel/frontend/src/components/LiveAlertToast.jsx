@@ -6,14 +6,41 @@ import { ShieldAlert, AlertTriangle } from 'lucide-react';
 const LiveAlertToast = () => {
   const [activeAlert, setActiveAlert] = useState(null);
   const timerRef = useRef(null);
+  const seenAlertsRef = useRef(new Map());
+  const activeAlertRef = useRef(null);
 
   useEffect(() => {
     const handleAlert = (event) => {
-      const data = event.detail;
+      const data = event.detail || {};
       const score = Number(data.risk_score || 0);
 
       // Trigger threshold: HIGH (70-84) and CRITICAL (>=85)
       if (score < 70) return;
+
+      const txId = data.tx_id || data.id;
+      const now = Date.now();
+
+      // Deduplicate: Don't show repeated alert for the same transaction within 10s
+      if (txId) {
+        const lastSeen = seenAlertsRef.current.get(txId);
+        if (lastSeen && now - lastSeen < 10000) {
+          return;
+        }
+        seenAlertsRef.current.set(txId, now);
+        if (seenAlertsRef.current.size > 100) {
+          for (const [k, v] of seenAlertsRef.current.entries()) {
+            if (now - v > 30000) seenAlertsRef.current.delete(k);
+          }
+        }
+      }
+
+      // Check transaction age: ignore stale historical transactions older than 30s
+      if (data.timestamp) {
+        const age = now - new Date(data.timestamp).getTime();
+        if (!isNaN(age) && age > 30000) {
+          return;
+        }
+      }
 
       const role = getRole();
       const isViewer = role !== 'admin';
@@ -24,13 +51,34 @@ const LiveAlertToast = () => {
       const duration = isCritical ? 3200 : 2400; // Display duration in ms
 
       const newAlert = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: txId || Math.random().toString(36).substr(2, 9),
+        tx_id: txId,
         title: isCritical ? 'CRITICAL FRAUD DETECTED' : 'HIGH RISK TRANSACTION',
         message: `${amountFormatted} • ${displaySender}`,
         score,
         isCritical,
         duration
       };
+
+      // Burst throttling:
+      // If an alert is actively showing, prevent rapid visual strobe
+      if (activeAlertRef.current) {
+        const currentIsCritical = activeAlertRef.current.isCritical;
+        const timeSinceActive = now - (activeAlertRef.current.displayedAt || 0);
+
+        // Keep CRITICAL alert if incoming is only HIGH
+        if (!isCritical && currentIsCritical) {
+          return;
+        }
+
+        // Throttle same severity within 1.2s
+        if (timeSinceActive < 1200 && (!isCritical || currentIsCritical)) {
+          return;
+        }
+      }
+
+      newAlert.displayedAt = now;
+      activeAlertRef.current = newAlert;
 
       // Clear existing dismiss timer to avoid premature closing of replacement alert
       if (timerRef.current) {
@@ -43,6 +91,7 @@ const LiveAlertToast = () => {
       // Auto-dismiss timer
       timerRef.current = setTimeout(() => {
         setActiveAlert(null);
+        activeAlertRef.current = null;
         timerRef.current = null;
       }, duration);
     };

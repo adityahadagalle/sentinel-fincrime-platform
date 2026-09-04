@@ -163,7 +163,7 @@ export const getCaseActionDetails = (c, actions = [], transactions = []) => {
 export const getCaseEffectiveStatus = (c, actions = [], transactions = []) => {
   const statusStr = String(c?.status || '').toUpperCase();
   const dispositionCode = String(c?.last_disposition_code || '').toUpperCase();
-  
+
   // Check if case is closed
   const hasCloseAction = (c?.actionLog && c.actionLog.some(a => {
     const act = String(a.action_type || a.action || '').toUpperCase();
@@ -175,10 +175,10 @@ export const getCaseEffectiveStatus = (c, actions = [], transactions = []) => {
   }));
 
   if (
-    statusStr === 'CLOSED' || statusStr === 'CLOSED_FP' || 
+    statusStr === 'CLOSED' || statusStr === 'CLOSED_FP' ||
     statusStr === 'CLOSED_CONFIRMED_FRAUD' || statusStr === 'CLOSED_FALSE_POSITIVE' ||
     statusStr === 'RESOLVED_DISMISSED' || statusStr === 'RESOLVED_APPROVED' ||
-    statusStr.includes('CLOSE') || dispositionCode === 'DISMISS_CASE' || 
+    statusStr.includes('CLOSE') || dispositionCode === 'DISMISS_CASE' ||
     dispositionCode === 'APPROVE_TRANSACTION' || hasCloseAction
   ) {
     return 'CLOSED';
@@ -330,8 +330,8 @@ const Cases = () => {
   };
 
   return (
-    <div className="p-8 bg-background min-h-screen font-sans">
-      <div className="max-w-[1720px] w-full mx-auto space-y-6">
+    <div className="p-8 bg-background min-h-full font-sans">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Page Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
@@ -341,16 +341,15 @@ const Cases = () => {
             </h1>
             <p className="text-xs text-slate-400 mt-1">Investigation workflows, status tracking, and authoritative audit logging</p>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <button
               onClick={handleExportAuditLog}
               disabled={role !== "admin"}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all border ${
-                role === "admin"
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all border ${role === "admin"
                   ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 shadow-sm'
                   : 'opacity-40 grayscale cursor-not-allowed bg-slate-900 border-slate-800 text-slate-500'
-              }`}
+                }`}
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export Audit Log</span>
@@ -374,16 +373,14 @@ const Cases = () => {
                       setFilter(f);
                       if (f === 'ACTIONED') setActionedSubFilter('ALL_ACTIONED');
                     }}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all flex items-center gap-2 ${
-                      filter === f
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all flex items-center gap-2 ${filter === f
                         ? 'bg-primary text-white shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                    }`}
+                      }`}
                   >
                     <span>{f}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
-                      filter === f ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
-                    }`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${filter === f ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+                      }`}>
                       {count}
                     </span>
                   </button>
@@ -405,11 +402,10 @@ const Cases = () => {
                 </span>
                 <button
                   onClick={() => setActionedSubFilter('ALL_ACTIONED')}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                    actionedSubFilter === 'ALL_ACTIONED'
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${actionedSubFilter === 'ALL_ACTIONED'
                       ? 'bg-slate-700 text-white border border-slate-500'
                       : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   All Actioned ({filterCounts['ACTIONED']})
                 </button>
@@ -423,11 +419,10 @@ const Cases = () => {
                 </span>
                 <button
                   onClick={() => setActionedSubFilter('ALL_AUTO')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                    actionedSubFilter === 'ALL_AUTO'
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${actionedSubFilter === 'ALL_AUTO'
                       ? 'bg-sky-600 text-white font-bold shadow-sm'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
-                  }`}
+                    }`}
                 >
                   All Automatic ({actionedBreakdown.totalAutoCases})
                 </button>
@@ -435,11 +430,10 @@ const Cases = () => {
                   <button
                     key={`auto_${code}`}
                     onClick={() => setActionedSubFilter(`AUTO_${code}`)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${
-                      actionedSubFilter === `AUTO_${code}`
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${actionedSubFilter === `AUTO_${code}`
                         ? 'bg-sky-600 text-white font-bold shadow-sm'
                         : 'bg-slate-800/50 text-slate-300 border border-slate-700/60 hover:bg-slate-700'
-                    }`}
+                      }`}
                   >
                     <span>{ACTION_LABELS[code] || formatStatusLabel(code)}</span>
                     <span className="px-1.5 py-0.2 rounded-full bg-slate-900 text-sky-300 text-[10px] font-bold">
@@ -457,11 +451,10 @@ const Cases = () => {
                 </span>
                 <button
                   onClick={() => setActionedSubFilter('ALL_MANUAL')}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
-                    actionedSubFilter === 'ALL_MANUAL'
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${actionedSubFilter === 'ALL_MANUAL'
                       ? 'bg-purple-600 text-white font-bold shadow-sm'
                       : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
-                  }`}
+                    }`}
                 >
                   All Manual ({actionedBreakdown.totalManualCases})
                 </button>
@@ -469,11 +462,10 @@ const Cases = () => {
                   <button
                     key={`manual_${code}`}
                     onClick={() => setActionedSubFilter(`MANUAL_${code}`)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${
-                      actionedSubFilter === `MANUAL_${code}`
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${actionedSubFilter === `MANUAL_${code}`
                         ? 'bg-purple-600 text-white font-bold shadow-sm'
                         : 'bg-slate-800/50 text-slate-300 border border-slate-700/60 hover:bg-slate-700'
-                    }`}
+                      }`}
                   >
                     <span>{ACTION_LABELS[code] || formatStatusLabel(code)}</span>
                     <span className="px-1.5 py-0.2 rounded-full bg-slate-900 text-purple-300 text-[10px] font-bold">
@@ -524,8 +516,8 @@ const Cases = () => {
                     const isActioned = effStatus === 'ACTIONED';
 
                     return (
-                      <tr 
-                        key={c.case_id} 
+                      <tr
+                        key={c.case_id}
                         onClick={() => handleRowClick(c)}
                         className="hover:bg-slate-800/40 transition-colors cursor-pointer border-b border-border/60"
                       >
@@ -536,13 +528,12 @@ const Cases = () => {
                           {role === "admin" ? (c.primary_tx_id || 'N/A') : '••••••••'}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded border ${
-                            isClosed
+                          <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded border ${isClosed
                               ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                               : isActioned
-                              ? 'bg-sky-500/15 text-sky-400 border-sky-500/30 font-semibold'
-                              : 'bg-slate-800 text-slate-300 border-slate-700/60'
-                          }`}>
+                                ? 'bg-sky-500/15 text-sky-400 border-sky-500/30 font-semibold'
+                                : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                            }`}>
                             {formatStatusLabel(effStatus)}
                           </span>
                         </td>
@@ -587,7 +578,7 @@ const Cases = () => {
         </div>
       </div>
 
-      <InvestigationSidebar 
+      <InvestigationSidebar
         isOpen={sidebarState.isOpen}
         selectedCase={sidebarState.case ? cases.find(c => c.case_id === sidebarState.case.case_id) : null}
         selectedTransaction={sidebarState.tx}

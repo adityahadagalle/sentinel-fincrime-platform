@@ -241,7 +241,7 @@ const Graph = () => {
 
   return (
     <ErrorBoundary>
-      <div className="w-full h-full flex flex-col overflow-hidden" style={{ height: '100vh', maxHeight: '100vh' }}>
+      <div className="w-full h-full flex flex-col overflow-hidden">
         <GraphModule
           key={`${activeCase.case_id || caseId}-${txFromUrl || activeCase.primary_tx_id || 'default'}`}
           caseData={activeCase}
