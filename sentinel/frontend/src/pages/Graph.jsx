@@ -38,14 +38,14 @@ const Graph = () => {
     let isMounted = true;
 
     if (txFromUrl) {
-      fetch(`${API_BASE}/transactions/${txFromUrl}/graph`)
-        .then((res) => (res.ok ? res.json() : null))
+      fetch(`/transactions/${txFromUrl}/graph`)
+        .then((res) => (res.ok ? res.json() : fetch(`${API_BASE}/transactions/${txFromUrl}/graph`).then(r => r.ok ? r.json() : null)))
         .then((data) => {
           if (isMounted && data && Array.isArray(data.nodes) && data.nodes.length > 0) {
             setFetchedGraph(data);
           } else if (caseId) {
-            return fetch(`${API_BASE}/cases/${caseId}/graph?tx_id=${txFromUrl}`)
-              .then((r) => (r.ok ? r.json() : null))
+            return fetch(`/cases/${caseId}/graph?tx_id=${txFromUrl}`)
+              .then((r) => (r.ok ? r.json() : fetch(`${API_BASE}/cases/${caseId}/graph?tx_id=${txFromUrl}`).then(r2 => r2.ok ? r2.json() : null)))
               .then((caseGraph) => {
                 if (isMounted && caseGraph) setFetchedGraph(caseGraph);
               });
@@ -53,8 +53,8 @@ const Graph = () => {
         })
         .catch(() => {});
     } else if (caseId) {
-      fetch(`${API_BASE}/cases/${caseId}/graph`)
-        .then((res) => (res.ok ? res.json() : null))
+      fetch(`/cases/${caseId}/graph`)
+        .then((res) => (res.ok ? res.json() : fetch(`${API_BASE}/cases/${caseId}/graph`).then(r => r.ok ? r.json() : null)))
         .then((data) => {
           if (isMounted && data) setFetchedGraph(data);
         })
@@ -82,30 +82,58 @@ const Graph = () => {
     if (txFromUrl) {
       // 1. If backend returned transaction-anchored graph, prioritize it
       if (fetchedGraph?.nodes && fetchedGraph.nodes.length > 0) {
+        const effRisk = Number(matchedTx?.risk_score ?? fetchedGraph.risk_level ?? base?.risk_level ?? 85);
         return {
-          case_id: caseId || matchedTx?.case_id || fetchedGraph.case_id || `CASE-${txFromUrl.slice(-8)}`,
+          case_id: caseId || matchedTx?.case_id || fetchedGraph.case_id || base?.case_id || `CASE-${txFromUrl.slice(-8)}`,
           primary_tx_id: txFromUrl,
-          status: (matchedTx?.risk_score || 0) >= 70 ? 'HIGH_RISK' : 'NEW',
-          risk_level: matchedTx?.risk_score || 50,
-          total_fraud_amount: matchedTx?.amount || 0,
+          status: effRisk >= 70 ? 'HIGH_RISK' : (base?.status || 'NEW'),
+          risk_level: effRisk,
+          total_fraud_amount: matchedTx?.amount || base?.total_fraud_amount || 0,
           nodes: fetchedGraph.nodes,
           edges: fetchedGraph.edges,
-          topology_type: fetchedGraph.topology_type || 'DIRECT_TRANSFER',
-          transactions: matchedTx ? [matchedTx] : []
+          topology_type: fetchedGraph.topology_type || base?.topology_type || 'DIRECT_TRANSFER',
+          transactions: matchedTx ? [matchedTx] : (base?.transactions || [])
         };
       }
 
       // 2. Otherwise derive from live related transactions in memory if matchedTx is available
       if (matchedTx) {
-      const relatedTxs = (transactions || []).filter(t => 
-        t && (
-          t.tx_id === matchedTx.tx_id ||
-          (t.case_id && t.case_id === matchedTx.case_id) ||
-          (t.chain_id && t.chain_id === matchedTx.chain_id) ||
-          t.receiver_account === matchedTx.sender_account ||
-          t.sender_account === matchedTx.receiver_account
-        )
-      );
+        const isLowRisk = (matchedTx?.risk_score || 0) < 50;
+        let relatedTxs = [matchedTx];
+        if (!isLowRisk) {
+          const connectedAccounts = new Set([matchedTx.sender_account, matchedTx.receiver_account].filter(Boolean));
+          const matchedTxIds = new Set([matchedTx.tx_id]);
+          const allList = transactions || [];
+
+          allList.forEach(t => {
+            if (!t || matchedTxIds.has(t.tx_id)) return;
+            if ((matchedTx.case_id && t.case_id === matchedTx.case_id) ||
+                (matchedTx.chain_id && t.chain_id === matchedTx.chain_id)) {
+              matchedTxIds.add(t.tx_id);
+              if (t.sender_account) connectedAccounts.add(t.sender_account);
+              if (t.receiver_account) connectedAccounts.add(t.receiver_account);
+            }
+          });
+
+          for (let hop = 0; hop < 6; hop++) {
+            if (connectedAccounts.size >= 7) break;
+            let added = false;
+            for (const t of allList) {
+              if (!t || matchedTxIds.has(t.tx_id)) continue;
+              if (connectedAccounts.has(t.sender_account) || connectedAccounts.has(t.receiver_account)) {
+                matchedTxIds.add(t.tx_id);
+                if (t.sender_account) connectedAccounts.add(t.sender_account);
+                if (t.receiver_account) connectedAccounts.add(t.receiver_account);
+                added = true;
+                if (connectedAccounts.size >= 7) break;
+              }
+            }
+            if (!added) break;
+          }
+
+          relatedTxs = allList.filter(t => t && matchedTxIds.has(t.tx_id));
+          if (relatedTxs.length === 0) relatedTxs = [matchedTx];
+        }
 
       const nodeMap = {};
       const edgeList = [];

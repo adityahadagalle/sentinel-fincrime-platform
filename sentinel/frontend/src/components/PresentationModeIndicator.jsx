@@ -1,6 +1,7 @@
 import React from 'react';
 import { BellOff, X } from 'lucide-react';
 import { usePresentationMode } from '../hooks/usePresentationMode';
+import { useLocation } from 'react-router-dom';
 
 /**
  * Non-intrusive floating indicator pill displayed when Presentation Mode is active.
@@ -8,9 +9,11 @@ import { usePresentationMode } from '../hooks/usePresentationMode';
  * along with a quick-exit control.
  */
 const PresentationModeIndicator = () => {
+  const location = useLocation();
+  const isMLPage = location.pathname === '/ml-intelligence' || location.pathname.startsWith('/ml-intelligence');
   const { isPresentationMode, setPresentationMode } = usePresentationMode();
 
-  if (!isPresentationMode) return null;
+  if (!isPresentationMode || isMLPage) return null;
 
   return (
     <div

@@ -80,7 +80,7 @@ def run_pipeline(tx: dict, store: dict, read_only: bool = False) -> dict:
         case = next((c for c in store.get("cases", {}).values()
                      if isinstance(c, dict) and (c.get("origin_account") == sender_id or sender_id in c.get("chain", []) or receiver_id in c.get("chain", []))
                      and c.get("status") in ["NEW", "HIGH_RISK"]
-                     and len(c.get("chain", [])) < c.get("max_nodes", 5)), None)
+                     and len(c.get("chain", [])) < c.get("max_nodes", 10)), None)
 
 
         if case:

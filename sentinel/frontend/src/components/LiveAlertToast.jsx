@@ -4,17 +4,20 @@ import { maskAccount } from '../utils/maskAccount';
 import { ShieldAlert, AlertTriangle } from 'lucide-react';
 import { usePresentationMode } from '../hooks/usePresentationMode';
 import { getPresentationMode } from '../presentationStore';
+import { useLocation } from 'react-router-dom';
 
 const LiveAlertToast = () => {
+  const location = useLocation();
+  const isMLPage = location.pathname === '/ml-intelligence' || location.pathname.startsWith('/ml-intelligence');
   const { isPresentationMode } = usePresentationMode();
   const [activeAlert, setActiveAlert] = useState(null);
   const timerRef = useRef(null);
   const seenAlertsRef = useRef(new Map());
   const activeAlertRef = useRef(null);
 
-  // Clear active alert immediately if Presentation Mode is activated
+  // Clear active alert immediately if Presentation Mode or ML page is active
   useEffect(() => {
-    if (isPresentationMode) {
+    if (isPresentationMode || isMLPage) {
       setActiveAlert(null);
       activeAlertRef.current = null;
       if (timerRef.current) {
@@ -22,12 +25,12 @@ const LiveAlertToast = () => {
         timerRef.current = null;
       }
     }
-  }, [isPresentationMode]);
+  }, [isPresentationMode, isMLPage]);
 
   useEffect(() => {
     const handleAlert = (event) => {
-      // Suppress pop-up visual display if Presentation Mode is active
-      if (getPresentationMode()) return;
+      // Suppress pop-up visual display if Presentation Mode is active or on ML page
+      if (isMLPage || getPresentationMode()) return;
 
       const data = event.detail || {};
       const score = Number(data.risk_score || 0);
@@ -119,9 +122,9 @@ const LiveAlertToast = () => {
       window.removeEventListener('sentinel_alert', handleAlert);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [isMLPage]);
 
-  if (isPresentationMode || !activeAlert) return null;
+  if (isPresentationMode || isMLPage || !activeAlert) return null;
 
   return (
     <div className="fixed top-5 right-8 z-[100] pointer-events-none font-sans select-none animate-in fade-in slide-in-from-top-2 duration-200">

@@ -2,28 +2,31 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShieldAlert, AlertTriangle, Activity, Lock, CheckCircle2, XCircle, Zap, Bot, MinusCircle } from 'lucide-react';
 import { usePresentationMode } from '../hooks/usePresentationMode';
 import { getPresentationMode } from '../presentationStore';
+import { useLocation } from 'react-router-dom';
 
 const ActionTakenToast = () => {
+  const location = useLocation();
+  const isMLPage = location.pathname === '/ml-intelligence' || location.pathname.startsWith('/ml-intelligence');
   const { isPresentationMode } = usePresentationMode();
   const [activeAction, setActiveAction] = useState(null);
   const timerRef = useRef(null);
   const seenActionsRef = useRef(new Map());
 
-  // Clear active action toast immediately if Presentation Mode is activated
+  // Clear active action toast immediately if Presentation Mode or ML page is activated
   useEffect(() => {
-    if (isPresentationMode) {
+    if (isPresentationMode || isMLPage) {
       setActiveAction(null);
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     }
-  }, [isPresentationMode]);
+  }, [isPresentationMode, isMLPage]);
 
   useEffect(() => {
     const handleAction = (event) => {
-      // Suppress action toast popups if Presentation Mode is active
-      if (getPresentationMode()) return;
+      // Suppress action toast popups if Presentation Mode is active or on ML page
+      if (isMLPage || getPresentationMode()) return;
 
       const data = event.detail || {};
       const rec = data.execution_record || data.execution_result || data;
@@ -133,9 +136,9 @@ const ActionTakenToast = () => {
       window.removeEventListener('sentinel_freeze_failed', handleAction);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [isMLPage]);
 
-  if (isPresentationMode || !activeAction) return null;
+  if (isPresentationMode || isMLPage || !activeAction) return null;
 
   return (
     <div className="fixed bottom-6 right-8 z-[110] font-sans select-none animate-in fade-in slide-in-from-bottom-3 duration-200 max-w-md w-full">
