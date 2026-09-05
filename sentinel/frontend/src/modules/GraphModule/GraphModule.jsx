@@ -217,8 +217,128 @@ const Minimap = ({ nodes, edges }) => (
   </div>
 );
 
+// ── RISK-BASED TOPOLOGY & NODE-COUNT GOVERNOR ─────────────────────────────────
+//
+// 1. Normal / Low-Risk Transactions:
+//    - Show a simple graph with 2 nodes where the underlying transaction supports
+//      only a direct flow.
+// 2. High-Risk Transactions:
+//    - Allow/show up to a maximum of 7 nodes when the underlying graph data contains
+//      those hops/entities.
+//    - Progressively reveals actual connected nodes during animation.
+//    - Strictly uses actual transaction graph data (no fabricated nodes).
+//    - Does NOT force every high-risk transaction to have 7 nodes.
+//    - Hard maximum = 7 nodes.
+//
+const filterGraphByRisk = (nodes = [], edges = [], caseData = {}, selectedTxId = '') => {
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    return { displayNodes: [], displayEdges: [] };
+  }
+
+  // Evaluate risk level across case & selected transaction signals
+  const allTxs = Array.isArray(caseData?.transactions) ? caseData.transactions : [];
+  const focalTx = (selectedTxId && (allTxs.find(t => t.tx_id === selectedTxId) || edges.find(e => (e.tx_id === selectedTxId || e.id === selectedTxId)))) ||
+                  allTxs[0] ||
+                  edges[0];
+
+  const caseRisk = Number(
+    caseData?.risk_level ??
+    caseData?.risk_score ??
+    focalTx?.risk_score ??
+    50
+  );
+
+  const isLowRiskOrSafe = (
+    caseRisk < 50 ||
+    caseData?.threshold === 'LOW' ||
+    focalTx?.threshold === 'LOW' ||
+    caseData?.status === 'SAFE' ||
+    String(caseData?.case_id || '').toUpperCase().includes('SAFE')
+  );
+
+  // ── RULE 1: NORMAL / LOW-RISK TRANSACTIONS ─────────────────────────────────
+  // If the transaction supports only a direct transfer (1 hop / direct flow),
+  // present the clean 2-node direct graph.
+  if (isLowRiskOrSafe) {
+    if (focalTx) {
+      const srcId = String(focalTx.source || focalTx.from || focalTx.sender_account || '');
+      const tgtId = String(focalTx.target || focalTx.to || focalTx.receiver_account || '');
+
+      if (srcId && tgtId && srcId !== tgtId) {
+        const directNodes = nodes.filter(n => {
+          const nid = String(n.accountId || n.id || n.account_id);
+          return nid === srcId || nid === tgtId;
+        });
+
+        // If underlying data contains the 2 direct endpoints
+        if (directNodes.length === 2) {
+          const directEdges = edges.filter(e => {
+            const sid = String(e.source || e.from || e.sender_account || '');
+            const tid = String(e.target || e.to || e.receiver_account || '');
+            return (sid === srcId && tid === tgtId) || (sid === tgtId && tid === srcId);
+          });
+          return {
+            displayNodes: directNodes,
+            displayEdges: directEdges.length > 0 ? directEdges : [focalTx]
+          };
+        }
+      }
+    }
+    // If raw data already has 2 nodes or fewer, return as-is
+    if (nodes.length <= 2) {
+      return { displayNodes: nodes, displayEdges: edges };
+    }
+  }
+
+  // ── RULE 2: HIGH-RISK TRANSACTIONS (MAXIMUM 7 NODES) ───────────────────────
+  // If graph already has <= 7 nodes, preserve actual transaction topology as-is
+  if (nodes.length <= 7) {
+    return { displayNodes: nodes, displayEdges: edges };
+  }
+
+  // When graph contains > 7 entities, retain at most 7 actual connected nodes
+  // prioritizing the focal transaction and primary connected hops.
+  const retainedNodeIds = new Set();
+
+  if (focalTx) {
+    const s = String(focalTx.source || focalTx.from || focalTx.sender_account || '');
+    const t = String(focalTx.target || focalTx.to || focalTx.receiver_account || '');
+    if (s) retainedNodeIds.add(s);
+    if (t) retainedNodeIds.add(t);
+  }
+
+  // Traverse actual edges sorted by hop order to include connected nodes up to 7
+  const sortedEdges = [...edges].sort((a, b) => (Number(a.hop_number || 1) - Number(b.hop_number || 1)));
+  for (const e of sortedEdges) {
+    if (retainedNodeIds.size >= 7) break;
+    const s = String(e.source || e.from || e.sender_account || '');
+    const t = String(e.target || e.to || e.receiver_account || '');
+    if (retainedNodeIds.has(s) || retainedNodeIds.has(t)) {
+      if (s) retainedNodeIds.add(s);
+      if (retainedNodeIds.size < 7 && t) retainedNodeIds.add(t);
+    }
+  }
+
+  // Fill up to 7 from existing nodes if not yet reached
+  if (retainedNodeIds.size < 7) {
+    for (const n of nodes) {
+      if (retainedNodeIds.size >= 7) break;
+      retainedNodeIds.add(String(n.accountId || n.id || n.account_id));
+    }
+  }
+
+  const displayNodes = nodes.filter(n => retainedNodeIds.has(String(n.accountId || n.id || n.account_id)));
+  const displayEdges = edges.filter(e => {
+    const s = String(e.source || e.from || e.sender_account || '');
+    const t = String(e.target || e.to || e.receiver_account || '');
+    return retainedNodeIds.has(s) && retainedNodeIds.has(t);
+  });
+
+  return { displayNodes, displayEdges };
+};
+
 // ── MAIN GRAPH MODULE ────────────────────────────────────────────────────────
-const GraphModule = ({ caseData, actions = [], onAction, connectionStatus, newTransactionEvent }) => {
+const GraphModule = ({ caseData, selectedTxId, actions = [], onAction, connectionStatus, newTransactionEvent }) => {
   const [selectedNode, setSelectedNode] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [briefModalOpen, setBriefModalOpen] = useState(false);
@@ -300,21 +420,26 @@ const GraphModule = ({ caseData, actions = [], onAction, connectionStatus, newTr
 
   const rawNodes = useMemo(() => Array.isArray(caseData?.nodes) ? caseData.nodes : [], [caseData?.nodes]);
   const rawEdges = useMemo(() => Array.isArray(caseData?.edges) ? caseData.edges : [], [caseData?.edges]);
+
+  const { displayNodes, displayEdges } = useMemo(() => {
+    return filterGraphByRisk(rawNodes, rawEdges, caseData, selectedTxId);
+  }, [rawNodes, rawEdges, caseData, selectedTxId]);
+
   const rawTopo = caseData?.topology_type || 'MULTI_HOP_DAG';
   const humanTopology = TOPOLOGY_LABELS[rawTopo] || rawTopo.replace(/_/g, ' ');
   const caseId = caseData?.case_id || 'CASE-ATTACK-001';
-  const primaryTx = caseData?.primary_tx_id || (rawEdges[0] ? (rawEdges[0].tx_id || rawEdges[0].id) : 'TX-001');
+  const primaryTx = caseData?.primary_tx_id || (displayEdges[0] ? (displayEdges[0].tx_id || displayEdges[0].id) : 'TX-001');
 
   const metrics = useMemo(() => {
-    const totalNodes = rawNodes.length;
-    const totalEdges = rawEdges.length;
-    const maxHops = Math.max(...rawNodes.map(n => Number(n.layer || 0)), ...rawEdges.map(e => Number(e.hop_number || 1)), 1);
-    const totalValue = rawEdges.reduce((acc, e) => acc + Number(e.amount || 0), 0);
-    const muleCount = rawNodes.filter(n => n.node_type === 'mule' || n.account_type === 'MULE').length;
-    const exitCount = rawNodes.filter(n => ['cashout','crypto','merchant'].includes(n.node_type) || n.account_type === 'DESTINATION').length;
-    const suspiciousFlows = rawEdges.filter(e => e.suspicious).length;
+    const totalNodes = displayNodes.length;
+    const totalEdges = displayEdges.length;
+    const maxHops = Math.max(...displayNodes.map(n => Number(n.layer || 0)), ...displayEdges.map(e => Number(e.hop_number || 1)), 1);
+    const totalValue = displayEdges.reduce((acc, e) => acc + Number(e.amount || 0), 0);
+    const muleCount = displayNodes.filter(n => n.node_type === 'mule' || n.account_type === 'MULE').length;
+    const exitCount = displayNodes.filter(n => ['cashout','crypto','merchant'].includes(n.node_type) || n.account_type === 'DESTINATION').length;
+    const suspiciousFlows = displayEdges.filter(e => e.suspicious).length;
     return { totalNodes, totalEdges, maxHops, totalValue, muleCount, exitCount, suspiciousFlows };
-  }, [rawNodes, rawEdges]);
+  }, [displayNodes, displayEdges]);
 
   const handleAction = useCallback(async (type, payload) => {
     if (role !== 'admin') return;
@@ -330,9 +455,9 @@ const GraphModule = ({ caseData, actions = [], onAction, connectionStatus, newTr
     e.preventDefault();
     const q = searchQuery.trim();
     if (!q) return;
-    const node = rawNodes.find(n => String(n.accountId || n.id).toLowerCase().includes(q.toLowerCase()));
+    const node = displayNodes.find(n => String(n.accountId || n.id).toLowerCase().includes(q.toLowerCase()));
     if (node) { canvasRef.current?.centerOn(node.accountId || node.id); setSelectedNode(node); setSelectedEdge(null); return; }
-    const edge = rawEdges.find(e => String(e.tx_id || e.id).toLowerCase().includes(q.toLowerCase()));
+    const edge = displayEdges.find(e => String(e.tx_id || e.id).toLowerCase().includes(q.toLowerCase()));
     if (edge) { canvasRef.current?.centerOn(edge.source || edge.from); setSelectedEdge(edge); setSelectedNode(null); }
   };
 
@@ -506,8 +631,8 @@ const GraphModule = ({ caseData, actions = [], onAction, connectionStatus, newTr
           {/* CYTOSCAPE CANVAS */}
           <GraphCanvas
             ref={canvasRef}
-            nodes={rawNodes}
-            edges={rawEdges}
+            nodes={displayNodes}
+            edges={displayEdges}
             onNodeClick={n => { setSelectedNode(n); setSelectedEdge(null); }}
             onEdgeClick={e => { setSelectedEdge(e); setSelectedNode(null); }}
             onSelectionChange={() => {}}
@@ -520,7 +645,7 @@ const GraphModule = ({ caseData, actions = [], onAction, connectionStatus, newTr
 
           {/* BOTTOM-RIGHT: Minimap */}
           <div className="absolute bottom-16 right-3 z-20">
-            <Minimap nodes={rawNodes} edges={rawEdges} />
+            <Minimap nodes={displayNodes} edges={displayEdges} />
           </div>
 
           {/* CENTERED INVESTIGATION BRIEF MODAL (QWEN AI) */}
@@ -546,7 +671,7 @@ const GraphModule = ({ caseData, actions = [], onAction, connectionStatus, newTr
 
           {/* BOTTOM TIMELINE */}
           <div className="absolute bottom-0 left-0 right-0 z-20">
-            <TimelineBar edges={rawEdges} />
+            <TimelineBar edges={displayEdges} />
           </div>
         </div>
       </div>

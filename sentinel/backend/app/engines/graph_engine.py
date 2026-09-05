@@ -235,7 +235,7 @@ def _recalculate_node_stats(graph: dict):
     graph["max_hops"] = max(max_layer, 1)
 
 
-DEFAULT_GRAPH_HOPS = 5
+DEFAULT_GRAPH_HOPS = 7
 MAX_GRAPH_HOPS = 8
 
 
@@ -442,12 +442,15 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
             active_node_ids.add(e.get("to"))
 
         final_nodes = [n for n in nodes_by_id.values() if (n.get("account_id") or n.get("id")) in active_node_ids]
+        f_risk = float(f_tx.get("risk_score", 85.0))
         graph = {
             "nodes": final_nodes,
             "edges": final_edges,
             "primary_tx_id": focus_tx_id,
             "case_id": f_case,
-            "chain_id": f_cid
+            "chain_id": f_cid,
+            "risk_level": f_risk,
+            "status": "HIGH_RISK" if f_risk >= 70 else "NEW"
         }
         _recalculate_node_stats(graph)
         graph["topology_type"] = classify_topology_archetype(graph)
@@ -588,7 +591,14 @@ def build_investigation_graph(case_id: str, store: dict, max_depth: int = DEFAUL
     if not final_nodes and nodes_by_id:
         final_nodes = list(nodes_by_id.values())
 
-    graph = {"nodes": final_nodes, "edges": final_edges, "case_id": case_id}
+    case_risk = float(case_obj.get("risk_level") or case_obj.get("risk_score") or (85.0 if case_obj.get("status") == "HIGH_RISK" else 50.0))
+    graph = {
+        "nodes": final_nodes,
+        "edges": final_edges,
+        "case_id": case_id,
+        "risk_level": case_risk,
+        "status": case_obj.get("status", "HIGH_RISK" if case_risk >= 70 else "NEW")
+    }
 
     store["graphs"][case_id] = graph
     _recalculate_node_stats(graph)

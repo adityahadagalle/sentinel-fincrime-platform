@@ -15,8 +15,8 @@ def process_scored_tx(tx: dict, score_output: dict, store: dict) -> dict:
     case_id = tx.get("case_id")
     hop_number = tx.get("hop_number", 0)
     
-    # GLOBAL DEPTH LIMIT: Stop processing chains deeper than 5 hops
-    if hop_number > 5:
+    # GLOBAL DEPTH LIMIT: Stop processing chains deeper than 8 hops
+    if hop_number > 8:
         return None
 
     # Allow chain persistence even with low scores, but keep a floor for new cases
@@ -79,7 +79,7 @@ def process_scored_tx(tx: dict, score_output: dict, store: dict) -> dict:
 
     if receiver not in case["chain"]:
         # Only add to chain if we haven't hit the randomized limit
-        if len(case["chain"]) < case.get("max_nodes", 5):
+        if len(case["chain"]) < case.get("max_nodes", 10):
             case["chain"].append(receiver)
             case["chain_depth"] = max(case["chain_depth"], hop_number)
             case["timeline"].append(_timeline_event("account_added_to_chain"))

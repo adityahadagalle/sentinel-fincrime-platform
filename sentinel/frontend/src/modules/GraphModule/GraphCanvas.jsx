@@ -5,13 +5,12 @@ import { getRole } from '../../roleStore';
 import { maskAccount } from '../../utils/maskAccount';
 
 // ── ANIMATION TIMING (ms) ─────────────────────────────────────────────────────
-// These constants control the pacing of the progressive reveal.
-// Tuned for a deliberate, forensic-investigation feel.
+// Tuned for an authoritative, high-precision forensic money-flow cadence.
 const TIMING = {
-  rootNodeReveal:     650,  // pause after the first (root) node appears before edges start
-  hopTransitionDelay: 350,  // gap before each new edge begins drawing
-  edgeDrawDuration:  1600,  // total canvas edge-stroke + particle animation duration
-  nodeArrivalPause:   500,  // pause after a destination node's arrival pulse
+  rootNodeReveal:     450,  // pause after root node appears before first flow starts
+  hopTransitionDelay: 220,  // gap before each new edge begins energizing
+  edgeDrawDuration:  1250,  // canvas edge-stroke + particle transit duration
+  nodeArrivalPause:   260,  // pause after destination node's arrival activation
 };
 
 // ── EDGE LABEL FORMATTER ──────────────────────────────────────────────────────
@@ -255,77 +254,149 @@ const buildRevealSequence = (cy) => {
 //   - Dashed stroke for suspicious edges, solid for normal
 //   - Color: #EF4444 (suspicious) or #38BDF8 (normal) — inherits existing semantics
 //
-const drawEdgeFrame = (ctx, srcPos, tgtPos, progress, isSuspicious) => {
+// ── CANVAS EDGE DRAWING & ADVANCED MONEY-FLOW ANIMATION ────────────────────────
+//
+// Follows the ACTUAL Cytoscape edge geometry (source -> target).
+// Progressive edge activation, moving financial transaction packet head,
+// luminous trailing flow stream, destination node receptive boundary interaction,
+// and subtle arrival pulse upon completion.
+//
+const drawEdgeFrame = (ctx, srcPt, tgtPt, cpX, cpY, progress, isSuspicious, tgtNodePos) => {
   if (progress <= 0) return;
 
-  const color     = isSuspicious ? '#EF4444' : '#38BDF8';
-  const lineWidth = isSuspicious ? 3.5 : 2.5;
+  const t = Math.max(0, Math.min(1, progress));
+  const primaryColor = isSuspicious ? '#EF4444' : '#38BDF8';
+  const trailColor   = isSuspicious ? '#FCA5A5' : '#BAE6FD';
+  const lineWidth    = isSuspicious ? 2.5 : 2.0;
 
-  // Approximate Cytoscape's bezier control point.
-  // Cytoscape uses control-point-step-size: 60; we use a 28px perpendicular
-  // offset in rendered space to get a visually matching curve.
-  const dx   = tgtPos.x - srcPos.x;
-  const dy   = tgtPos.y - srcPos.y;
-  const len  = Math.sqrt(dx * dx + dy * dy) || 1;
-  const perpX = (-dy / len) * 28;
-  const perpY = ( dx / len) * 28;
-  const cpX = (srcPos.x + tgtPos.x) / 2 + perpX;
-  const cpY = (srcPos.y + tgtPos.y) / 2 + perpY;
+  // Bezier point evaluator at parameter u ∈ [0, 1]
+  const getPoint = (u) => {
+    const mu = 1 - u;
+    return {
+      x: mu * mu * srcPt.x + 2 * mu * u * cpX + u * u * tgtPt.x,
+      y: mu * mu * srcPt.y + 2 * mu * u * cpY + u * u * tgtPt.y
+    };
+  };
 
-  const t     = Math.max(0, Math.min(1, progress));
-  const steps = 80; // bezier sample count
+  // Bezier tangent evaluator at parameter u ∈ [0, 1]
+  const getTangent = (u) => {
+    const mu = 1 - u;
+    return {
+      x: 2 * mu * (cpX - srcPt.x) + 2 * u * (tgtPt.x - cpX),
+      y: 2 * mu * (cpY - srcPt.y) + 2 * u * (tgtPt.y - cpY)
+    };
+  };
 
   ctx.save();
 
-  // ── Growing stroke from source to current tip ────────────────────────────
+  // 1. Subtle Inactive Edge Conduit (Shows underlying route being energized)
   ctx.beginPath();
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = isSuspicious ? 'rgba(239, 68, 68, 0.14)' : 'rgba(56, 189, 248, 0.14)';
   ctx.lineWidth   = lineWidth;
   ctx.lineCap     = 'round';
   ctx.lineJoin    = 'round';
-  ctx.globalAlpha = 0.85;
-  if (isSuspicious) ctx.setLineDash([8, 4]);
-
+  const fullSteps = 60;
   let first = true;
-  for (let i = 0; i <= steps; i++) {
-    const u  = (i / steps) * t;
-    const mu = 1 - u;
-    const px = mu * mu * srcPos.x + 2 * mu * u * cpX + u * u * tgtPos.x;
-    const py = mu * mu * srcPos.y + 2 * mu * u * cpY + u * u * tgtPos.y;
-    if (first) { ctx.moveTo(px, py); first = false; }
-    else         ctx.lineTo(px, py);
+  for (let i = 0; i <= fullSteps; i++) {
+    const pt = getPoint(i / fullSteps);
+    if (first) { ctx.moveTo(pt.x, pt.y); first = false; }
+    else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.stroke();
+
+  // 2. Progressive Active Flow: Energized edge advancing from source to current progress
+  ctx.beginPath();
+  ctx.strokeStyle = primaryColor;
+  ctx.lineWidth   = lineWidth;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.globalAlpha = 0.92;
+  if (isSuspicious) ctx.setLineDash([6, 4]);
+
+  const activeSteps = Math.max(10, Math.round(t * 60));
+  first = true;
+  for (let i = 0; i <= activeSteps; i++) {
+    const u = (i / activeSteps) * t;
+    const pt = getPoint(u);
+    if (first) { ctx.moveTo(pt.x, pt.y); first = false; }
+    else ctx.lineTo(pt.x, pt.y);
   }
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── Particle (money in transit) at the stroke tip ────────────────────────
-  const mu = 1 - t;
-  const px = mu * mu * srcPos.x + 2 * mu * t * cpX + t * t * tgtPos.x;
-  const py = mu * mu * srcPos.y + 2 * mu * t * cpY + t * t * tgtPos.y;
+  // 3. Subtle Trailing Flow: Streaming luminosity immediately behind moving indicator
+  const trailStart = Math.max(0, t - 0.22);
+  if (t > 0.04) {
+    const trailSteps = 16;
+    for (let i = 0; i < trailSteps; i++) {
+      const u1 = trailStart + (i / trailSteps) * (t - trailStart);
+      const u2 = trailStart + ((i + 1) / trailSteps) * (t - trailStart);
+      const p1 = getPoint(u1);
+      const p2 = getPoint(u2);
+      const segAlpha = (i / trailSteps) * 0.55;
 
-  // Outer glow ring
-  ctx.globalAlpha = 0.18;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = trailColor;
+      ctx.lineWidth   = lineWidth + 1.2;
+      ctx.globalAlpha = segAlpha;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+    }
+  }
+
+  // 4. Refined Moving Transaction Indicator (Transaction packet in transit)
+  const tipPt = getPoint(t);
+  const tan   = getTangent(t);
+  const angle = Math.atan2(tan.y, tan.x);
+
+  // Subtle restrained glow
+  ctx.globalAlpha = 0.25;
   ctx.beginPath();
-  ctx.arc(px, py, 12, 0, Math.PI * 2);
-  ctx.fillStyle = color;
+  ctx.arc(tipPt.x, tipPt.y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = primaryColor;
   ctx.fill();
 
-  // Mid glow
-  ctx.globalAlpha = 0.40;
-  ctx.beginPath();
-  ctx.arc(px, py, 7.5, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
+  // Forward-directed transaction packet (sleek financial diamond/capsule)
+  ctx.save();
+  ctx.translate(tipPt.x, tipPt.y);
+  ctx.rotate(angle);
 
-  // Solid core particle
+  // Outer bezel
   ctx.globalAlpha = 1;
   ctx.beginPath();
-  ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-  ctx.fillStyle   = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur  = 14;
+  ctx.moveTo(4.5, 0);
+  ctx.lineTo(-2.5, 3.2);
+  ctx.lineTo(-4.5, 0);
+  ctx.lineTo(-2.5, -3.2);
+  ctx.closePath();
+  ctx.fillStyle = primaryColor;
   ctx.fill();
-  ctx.shadowBlur  = 0;
+
+  // Crisp white contrast core
+  ctx.beginPath();
+  ctx.moveTo(2.5, 0);
+  ctx.lineTo(-1.5, 1.8);
+  ctx.lineTo(-2.5, 0);
+  ctx.lineTo(-1.5, -1.8);
+  ctx.closePath();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+
+  ctx.restore();
+
+  // 5. Visual Interaction with Destination Node (Leading flow absorption)
+  if (t > 0.80 && tgtNodePos) {
+    const proximityFactor = (t - 0.80) / 0.20;
+    ctx.beginPath();
+    ctx.arc(tgtNodePos.x, tgtNodePos.y, 35.5, 0, Math.PI * 2);
+    ctx.strokeStyle = isSuspicious
+      ? `rgba(239, 68, 68, ${proximityFactor * 0.75})`
+      : `rgba(56, 189, 248, ${proximityFactor * 0.75})`;
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+  }
 
   ctx.restore();
 };
@@ -408,8 +479,8 @@ const startRevealAnimation = (cy, canvasEl, animStateRef) => {
     });
 
   // Animate a single edge stroke + particle using requestAnimationFrame.
-  // Positions are re-read every frame so pan/zoom during animation stays correct.
-  const animateEdge = (sourceId, targetId, isSuspicious, durationMs) =>
+  // Uses ACTUAL Cytoscape edge geometry and rendered endpoints.
+  const animateEdge = (edgeId, sourceId, targetId, isSuspicious, durationMs) =>
     new Promise((resolve) => {
       if (cancelled) { resolve(); return; }
       const startTime = performance.now();
@@ -423,22 +494,51 @@ const startRevealAnimation = (cy, canvasEl, animStateRef) => {
         const cssH = canvasEl.height / dpr;
         ctx.clearRect(0, 0, cssW, cssH);
 
+        const edge    = cy.getElementById(edgeId);
         const srcNode = cy.getElementById(sourceId);
         const tgtNode = cy.getElementById(targetId);
-        if (!srcNode.length || !tgtNode.length) { rafId = null; resolve(); return; }
+        if (!srcNode.length || !tgtNode.length || !edge.length) {
+          rafId = null;
+          resolve();
+          return;
+        }
 
-        const srcPos = srcNode.renderedPosition();
-        const tgtPos = tgtNode.renderedPosition();
+        // Exact rendered endpoints directly from Cytoscape
+        let srcPt = null;
+        let tgtPt = null;
+        try {
+          if (typeof edge.renderedSourceEndpoint === 'function') srcPt = edge.renderedSourceEndpoint();
+          if (typeof edge.renderedTargetEndpoint === 'function') tgtPt = edge.renderedTargetEndpoint();
+        } catch (e) {}
+
+        if (!srcPt || typeof srcPt.x !== 'number') srcPt = srcNode.renderedPosition();
+        if (!tgtPt || typeof tgtPt.x !== 'number') tgtPt = tgtNode.renderedPosition();
+
+        let midPt = null;
+        try {
+          if (typeof edge.renderedMidpoint === 'function') midPt = edge.renderedMidpoint();
+        } catch (e) {}
+
+        let cpX, cpY;
+        if (midPt && typeof midPt.x === 'number') {
+          // Exact quadratic bezier control point matching Cytoscape's curve:
+          // M = 0.25*P0 + 0.5*P1 + 0.25*P2  =>  P1 = 2*M - 0.5*(P0 + P2)
+          cpX = 2 * midPt.x - 0.5 * (srcPt.x + tgtPt.x);
+          cpY = 2 * midPt.y - 0.5 * (srcPt.y + tgtPt.y);
+        } else {
+          cpX = (srcPt.x + tgtPt.x) / 2;
+          cpY = (srcPt.y + tgtPt.y) / 2;
+        }
 
         const elapsed = now - startTime;
         const rawP    = Math.min(elapsed / durationMs, 1);
 
-        // Cubic ease-in-out for natural, deliberate motion
+        // Cubic ease-in-out for deliberate, authoritative financial flow
         const progress = rawP < 0.5
           ? 4 * rawP * rawP * rawP
           : 1 - Math.pow(-2 * rawP + 2, 3) / 2;
 
-        drawEdgeFrame(ctx, srcPos, tgtPos, progress, isSuspicious);
+        drawEdgeFrame(ctx, srcPt, tgtPt, cpX, cpY, progress, isSuspicious, tgtNode.renderedPosition());
 
         if (rawP < 1) {
           rafId = requestAnimationFrame(draw);
@@ -473,23 +573,23 @@ const startRevealAnimation = (cy, canvasEl, animStateRef) => {
         const node = cy.getElementById(step.id);
         if (!node.length) continue;
 
-        // Reveal: removing reveal-hidden triggers Cytoscape's opacity transition (~200ms fade-in)
+        // Reveal: removing reveal-hidden triggers Cytoscape's opacity transition
         node.removeClass('reveal-hidden').addClass('node-arriving');
 
         if (step.isRoot) {
-          // Let the root node settle visually before the first edge draws
+          // Let root node settle visually before the first edge draws
           await delay(TIMING.rootNodeReveal);
         } else {
           // Destination node: wait for arrival pulse to register
           await delay(TIMING.nodeArrivalPause);
         }
 
-        // Schedule removal of the arriving class (non-blocking — runs in background)
+        // Schedule removal of arriving class
         if (!cancelled) {
           const nRef = node;
           const tid  = setTimeout(() => {
             if (!cy.destroyed()) nRef.removeClass('node-arriving');
-          }, 650);
+          }, 450);
           timeoutIds.push(tid);
         }
 
@@ -500,22 +600,20 @@ const startRevealAnimation = (cy, canvasEl, animStateRef) => {
         const edge = cy.getElementById(step.id);
         if (!edge.length) continue;
 
-        // Brief pause before edge starts drawing (creates the "and then…" cadence)
+        // Brief pause before edge starts drawing (creates natural flow cadence)
         await delay(TIMING.hopTransitionDelay);
         if (cancelled) break;
 
         const isSuspicious = !!edge.data('suspicious');
 
-        // ── Animate canvas stroke + particle ─────────────────────────────
-        // During this time: the real Cytoscape edge stays hidden (reveal-hidden).
-        // The canvas overlay shows the growing stroke and particle instead.
-        await animateEdge(step.source, step.target, isSuspicious, TIMING.edgeDrawDuration);
+        // Animate canvas stroke + particle along actual edge geometry
+        await animateEdge(step.id, step.source, step.target, isSuspicious, TIMING.edgeDrawDuration);
         if (cancelled) break;
 
-        // ── Particle arrives: reveal real edge, clear canvas overlay ──────
+        // Particle arrives: reveal real edge, clear canvas overlay
         edge.removeClass('reveal-hidden');
         doClearCanvas();
-        // (destination node reveal is the very next step in the sequence)
+        // (destination node reveal and arrival activation is the very next step)
       }
     }
 
@@ -823,8 +921,8 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], onNodeClick, onEdgeCli
       });
     });
 
-    // ── Mouseout: Node & Edge ───────────────────────────────────────────────
-    cy.on('mouseout', 'node edge', () => {
+    // ── Mouseout: Node & Edge (Immediately clears hover inspection) ────────
+    cy.on('mouseout', 'node, edge', () => {
       cy.elements().removeClass('node-hovered flow-incoming flow-outgoing node-flow-source node-flow-target edge-hovered');
 
       // If a selection was tapped/pinned, restore that selection; otherwise undim all
@@ -849,6 +947,32 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], onNodeClick, onEdgeCli
         cy.elements().removeClass('dimmed');
       }
 
+      setTooltip(null);
+    });
+
+    // ── Mousemove on Background (Immediately dismiss hover if over empty space) ─
+    cy.on('mousemove', (evt) => {
+      if (evt.target === cy) {
+        setTooltip(null);
+        cy.elements().removeClass('node-hovered flow-incoming flow-outgoing node-flow-source node-flow-target edge-hovered');
+        if (activeSelectionRef.current) {
+          const sel = activeSelectionRef.current;
+          const ele = cy.getElementById(sel.id);
+          if (ele.length > 0) {
+            const pathElements = sel.type === 'node'
+              ? ele.successors().union(ele.predecessors()).union(ele)
+              : ele.source().successors().union(ele.source().predecessors()).union(ele.source()).union(ele);
+            pathElements.addClass('path-highlight').removeClass('dimmed');
+            cy.elements().difference(pathElements).addClass('dimmed');
+          }
+        } else {
+          cy.elements().removeClass('dimmed');
+        }
+      }
+    });
+
+    // ── Viewport pan/zoom: immediately dismiss floating tooltip ─────────────
+    cy.on('pan zoom drag', () => {
       setTooltip(null);
     });
 
@@ -1016,6 +1140,25 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], onNodeClick, onEdgeCli
       <div
         ref={containerRef}
         className="graph-canvas"
+        onMouseLeave={() => {
+          setTooltip(null);
+          if (cyRef.current) {
+            cyRef.current.elements().removeClass('node-hovered flow-incoming flow-outgoing node-flow-source node-flow-target edge-hovered');
+            if (activeSelectionRef.current) {
+              const sel = activeSelectionRef.current;
+              const ele = cyRef.current.getElementById(sel.id);
+              if (ele.length > 0) {
+                const pathElements = sel.type === 'node'
+                  ? ele.successors().union(ele.predecessors()).union(ele)
+                  : ele.source().successors().union(ele.source().predecessors()).union(ele.source()).union(ele);
+                pathElements.addClass('path-highlight').removeClass('dimmed');
+                cyRef.current.elements().difference(pathElements).addClass('dimmed');
+              }
+            } else {
+              cyRef.current.elements().removeClass('dimmed');
+            }
+          }
+        }}
         style={{
           width:      '100%',
           height:     '100%',
@@ -1047,7 +1190,7 @@ const GraphCanvas = forwardRef(({ nodes = [], edges = [], onNodeClick, onEdgeCli
       {/* ── FLOATING HOVER TOOLTIP POPOVER (Enterprise Financial Investigation Card) ── */}
       {tooltip && (
         <div
-          className="pointer-events-none absolute z-50 bg-[#0A0F1D]/95 border border-slate-700/80 rounded-lg p-3 shadow-2xl backdrop-blur-md font-mono text-[11px] text-slate-200 min-w-[270px] max-w-[320px] transition-opacity duration-150"
+          className="pointer-events-none absolute z-50 bg-[#060B15]/98 border border-[#1E293B] rounded-lg p-3 shadow-2xl backdrop-blur-md font-mono text-[11px] text-slate-200 min-w-[270px] max-w-[320px] transition-opacity duration-150"
           style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}
         >
           {tooltip.type === 'node' ? (() => {

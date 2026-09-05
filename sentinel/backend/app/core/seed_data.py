@@ -380,12 +380,14 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
     upi4 = "UPI-HANDLE-6003"
     cash4 = "CASHOUT-TERM-6004"
     merch4 = "ACC-MERCH-6005"
+    crypto4 = "CRYPTO-DESK-6006"
 
     tx_4a_id = "TX-FRAUD-6001"
     tx_4b_id = "TX-FRAUD-6002"
     tx_4c_id = "TX-FRAUD-6003"
     tx_4d_id = "TX-FRAUD-6004"
     tx_4e_id = "TX-FRAUD-6005"
+    tx_4f_id = "TX-FRAUD-6006"
 
     store["accounts"][v4] = {
         "account_id": v4,
@@ -429,11 +431,19 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
     }
     store["accounts"][merch4] = {
         "account_id": merch4,
-        "account_type": "DESTINATION",
+        "account_type": "INTERMEDIARY",
         "node_type": "merchant",
         "status": "flagged",
         "current_balance_sim": 240000.0,
         "risk_score": 98.0
+    }
+    store["accounts"][crypto4] = {
+        "account_id": crypto4,
+        "account_type": "DESTINATION",
+        "node_type": "crypto",
+        "status": "flagged",
+        "current_balance_sim": 230000.0,
+        "risk_score": 99.0
     }
 
     tx_4a = {
@@ -449,7 +459,7 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
         "channel": "NEFT",
         "risk_score": 82,
         "hop_number": 1,
-        "total_hops": 5,
+        "total_hops": 6,
         "pattern_type": "MULE_CHAIN"
     }
     tx_4b = {
@@ -466,7 +476,7 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
         "channel": "IMPS",
         "risk_score": 86,
         "hop_number": 2,
-        "total_hops": 5,
+        "total_hops": 6,
         "pattern_type": "MULE_CHAIN"
     }
     tx_4c = {
@@ -483,7 +493,7 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
         "channel": "UPI",
         "risk_score": 90,
         "hop_number": 3,
-        "total_hops": 5,
+        "total_hops": 6,
         "pattern_type": "MULE_CHAIN"
     }
     tx_4d = {
@@ -500,7 +510,7 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
         "channel": "CARD",
         "risk_score": 95,
         "hop_number": 4,
-        "total_hops": 5,
+        "total_hops": 6,
         "pattern_type": "MULE_CHAIN"
     }
     tx_4e = {
@@ -517,24 +527,41 @@ def seed_initial_demonstration_data(store: Dict[str, Any]) -> None:
         "channel": "NEFT",
         "risk_score": 98,
         "hop_number": 5,
-        "total_hops": 5,
+        "total_hops": 6,
+        "pattern_type": "MULE_CHAIN"
+    }
+    tx_4f = {
+        "tx_id": tx_4f_id,
+        "timestamp": now,
+        "case_id": case_4_id,
+        "chain_id": chain_4_id,
+        "root_transaction_id": tx_4a_id,
+        "parent_transaction_id": tx_4e_id,
+        "sender_account": merch4,
+        "receiver_account": crypto4,
+        "amount": 230000.0,
+        "currency": "INR",
+        "channel": "IMPS",
+        "risk_score": 99,
+        "hop_number": 6,
+        "total_hops": 6,
         "pattern_type": "MULE_CHAIN"
     }
 
-    for t in [tx_4a, tx_4b, tx_4c, tx_4d, tx_4e]:
+    for t in [tx_4a, tx_4b, tx_4c, tx_4d, tx_4e, tx_4f]:
         store["transactions"][t["tx_id"]] = t
 
     store["cases"][case_4_id] = {
         "case_id": case_4_id,
         "chain_id": chain_4_id,
         "status": "HIGH_RISK",
-        "risk_level": 98.0,
+        "risk_level": 99.0,
         "primary_tx_id": tx_4a_id,
-        "total_fraud_amount": 1300000.0,
-        "recoverable_amount": 240000.0,
+        "total_fraud_amount": 1530000.0,
+        "recoverable_amount": 230000.0,
         "origin_account": v4,
-        "chain": [v4, m4_1, m4_2, upi4, cash4, merch4],
-        "transactions": [tx_4a_id, tx_4b_id, tx_4c_id, tx_4d_id, tx_4e_id],
+        "chain": [v4, m4_1, m4_2, upi4, cash4, merch4, crypto4],
+        "transactions": [tx_4a_id, tx_4b_id, tx_4c_id, tx_4d_id, tx_4e_id, tx_4f_id],
         "actions_taken": [],
         "timeline": [{"at": now, "event": "case_created", "actor": "system"}]
     }

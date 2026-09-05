@@ -41,7 +41,7 @@ def _run_forked_scenario(name, start_prefix, amount_range, extra_flags=None):
     high = min(high, CHANNEL_CAPS.get(channel, 500000))
     total_amount = round(random.uniform(low, high), 2)
 
-    max_hops = random.randint(1, 4)
+    max_hops = random.randint(1, 6)
     queue = [(victim, total_amount, 0, None)]
 
     while queue:

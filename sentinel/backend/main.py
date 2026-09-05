@@ -2415,6 +2415,7 @@ async def trigger_attack_mode() -> dict[str, Any]:
         (f"ACC-HUB-{random.randint(1000, 9999)}", "INTERMEDIARY"),
         (f"ACC-MULE-{random.randint(1000, 9999)}", "MULE"),
         (f"ACC-HUB-{random.randint(1000, 9999)}", "INTERMEDIARY"),
+        (f"ACC-MULE-{random.randint(1000, 9999)}", "MULE"),
         (f"ACC-MERCH-{random.randint(1000, 9999)}", "DESTINATION")
     ]
     for acc_id, acc_type in attack_nodes:
@@ -2429,6 +2430,7 @@ async def trigger_attack_mode() -> dict[str, Any]:
         {"is_crypto_related": True, "channel": "IMPS", "amount": 465000.0, "risk_score": 80},
         {"device_changed": True, "location_changed": True, "channel": "UPI", "amount": 450000.0, "risk_score": 85},
         {"on_active_call": True, "is_scripted": True, "channel": "CARD", "amount": 435000.0, "risk_score": 90},
+        {"is_cross_border": True, "channel": "IMPS", "amount": 425000.0, "risk_score": 94},
         {"bulk_transfer_flag": True, "channel": "NEFT", "amount": 420000.0, "risk_score": 98, "requested_action": "FREEZE", "reason": "Active multi-hop fraud attack chain detected requiring account freeze."}
     ]
 
@@ -2449,7 +2451,7 @@ async def trigger_attack_mode() -> dict[str, Any]:
                 "channel": hspec.get("channel", "NEFT"),
                 "chain_id": chain_id,
                 "hop_number": i + 1,
-                "total_hops": 5,
+                "total_hops": 6,
                 "pattern_type": "MULE_CHAIN",
                 "parent_transaction_id": prev_tx_id,
                 "root_transaction_id": root_tx_id,
@@ -2556,13 +2558,15 @@ async def trigger_multi_hop_scenario(
             generated_txs.append(tx)
 
     elif s_key in ("scenario-3", "5-hop", "mule-chain"):
-        # Pattern B: 5-Hop Mule Chain / Layering (Critical FREEZE)
+        # Pattern B: 6-Hop Mule Chain / Layering (7 Nodes) (Critical FREEZE)
         nodes = [
             ("ACC-USR-1023", "SOURCE"),
             ("ACC-MULE-4821", "MULE"),
             ("ACC-INT-7732", "INTERMEDIARY"),
             ("ACC-MULE-9182", "MULE"),
-            ("ACC-MERCH-4412", "DESTINATION")
+            ("ACC-UPI-6003", "INTERMEDIARY"),
+            ("ACC-MERCH-4412", "DESTINATION"),
+            ("ACC-CRYPTO-6006", "DESTINATION")
         ]
         root_tx_id = f"TX-M5-001"
         for i in range(len(nodes) - 1):
@@ -2576,13 +2580,13 @@ async def trigger_multi_hop_scenario(
                 "sender_account": s_acc,
                 "receiver_account": r_acc,
                 "amount": round(98000.0 * (0.97 ** i), 2),
-                "risk_score": min(95, 75 + (i * 5)),
+                "risk_score": min(95, 75 + (i * 4)),
                 "requested_action": "FREEZE" if i == len(nodes) - 2 else "ENHANCED_MONITORING",
-                "reason": f"Multi-hop mule chain layering (Hop {i+1}/4) across rapid velocity accounts.",
+                "reason": f"Multi-hop mule chain layering (Hop {i+1}/6) across rapid velocity accounts.",
                 "channel": "SWIFT" if i >= 2 else "NEFT",
                 "chain_id": chain_id,
                 "hop_number": i + 1,
-                "total_hops": 4,
+                "total_hops": 6,
                 "pattern_type": "MULE_CHAIN",
                 "parent_transaction_id": f"TX-M5-00{i}" if i > 0 else None,
                 "root_transaction_id": root_tx_id

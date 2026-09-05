@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
-import { Activity, LayoutDashboard, Briefcase, Shield, LogOut, ShieldAlert, FlaskConical } from 'lucide-react';
+import { Activity, LayoutDashboard, Briefcase, Shield, LogOut, ShieldAlert, FlaskConical, Brain } from 'lucide-react';
 
 // Pages
 import Feed from './pages/Feed';
@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Cases from './pages/Cases';
 import Graph from './pages/Graph';
 import BenchmarkLab from './pages/BenchmarkLab';
+import MLIntelligence from './pages/MLIntelligence';
 
 import SystemStatusBar from './components/SystemStatusBar';
 import AttackModeToggle from './components/AttackModeToggle';
@@ -147,6 +148,10 @@ const App = () => {
                 <FlaskConical className="w-4 h-4 shrink-0" />
                 <span>Benchmark Lab</span>
               </NavLink>
+              <NavLink to="/ml-intelligence" className={navItemClass}>
+                <Brain className="w-4 h-4 shrink-0" />
+                <span>ML Intelligence</span>
+              </NavLink>
             </nav>
           </div>
 
@@ -180,6 +185,7 @@ const App = () => {
               <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
               <Route path="/cases" element={<Cases />} />
               <Route path="/benchmark" element={<ErrorBoundary><BenchmarkLab /></ErrorBoundary>} />
+              <Route path="/ml-intelligence" element={<ErrorBoundary><MLIntelligence /></ErrorBoundary>} />
               <Route path="/graph/:caseId" element={<ErrorBoundary><Graph /></ErrorBoundary>} />
             </Routes>
           </div>
